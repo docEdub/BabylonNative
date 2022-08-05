@@ -14,6 +14,14 @@ const words = [
     "are"
 ];
 
+const done = [
+    false,
+    false,
+    false,
+    false,
+    false
+];
+
 const fullTimeout = timeouts.reduce((acc, curr) => (acc + curr));
 
 let message = " ";
@@ -21,6 +29,7 @@ let message = " ";
 timeouts.forEach((duration, index) => {
     setTimeout(() => {
         message = `${message} ${words[index]}`;
+        done[index] = true
     }, duration);
 });
 
@@ -31,11 +40,16 @@ setTimeout(() => {
     console.log(`Elapsed time: ${endTime - startTime} (Expected: ${fullTimeout})`);
 }, fullTimeout);
 
-function ping() {
+function waitUntilAllDone() {
     setTimeout(() => {
-        console.log("Ping");
-        ping();
+        for (let i = 0; i < done.length; i++) {
+            if (!done[i]) {
+                waitUntilAllDone();
+                return;
+            }
+        }
+        console.log(`All done`);
     }, 1000);
 }
 
-ping();
+waitUntilAllDone();
