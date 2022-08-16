@@ -145,6 +145,8 @@ namespace Babylon::Plugins
         arcana::make_task(m_deviceContext->BeforeRenderScheduler(), arcana::cancellation::none(), [this, textureHandle] {
             if (m_implData->textureBGRA)
             {
+                // Do the shader operation here for BGRA to RGBA.
+                //      - The override internal call would then only need to be done once when the texture is first setup in bgfx.
                 bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureBGRA));
             }
         });

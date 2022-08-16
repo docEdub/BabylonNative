@@ -42,6 +42,8 @@ namespace {
      NOTE: For Metal UV space, 0,0 is in the top left, not the bottom left, so the V component of the UV is swapped from what you would see for OpenGL. See https://developer.apple.com/documentation/metal/creating_and_sampling_textures.
      NOTE2: Because Metal coordinates origin is different compared to OpenGL (and same as D3D), V has been flipped so rendering is not vertically flipped
      */
+    // NB: The camera UVs are set dynamically depending on the ARKit view size on line 361-ish. This will probably not be needed for the webcam video texture conversion.
+    //      These vertices can probably be hard-coded into the shader with a uniform (or some other type of constant).
     static XRVertex vertices[] = {
         // 2D positions, UV,        camera UV
         { { -1, -1 },   { 0, 1 },   { 0, 0} },
@@ -557,6 +559,9 @@ namespace xr {
         // The shader is used in two passes:
         // 1. Render the camera texture to the color render texture (see GetNextFrame).
         // 2. Render the composited texture to the screen (see DrawFrame).
+        // NB: Use this shader as a reference for the BGRA to RGBA conversion.
+        //      - The pixel channels might not need to be swapped at all. A straight copy from one texture to the other might do the swap automatically based on the texture formats.
+        //      - Use Y CbCr camera format. (This shader does the conversion from Y CbCr to RGBA).
         constexpr char shaderSource[] = R"(
             #include <metal_stdlib>
             #include <simd/simd.h>
@@ -688,6 +693,8 @@ namespace xr {
         float DepthFarZ{ DEFAULT_DEPTH_FAR_Z };
         bool FeaturePointCloudEnabled{ false };
 
+        // NB: commandQueue is from bgfx.
+        //      - Try creating your own command queue first but if you see crashes or artifacts in the render, use the existing bgfx command queue if this happens.
         Impl(System::Impl& systemImpl, void* graphicsContext, void* commandQueue, std::function<void*()> windowProvider)
             : SystemImpl{ systemImpl }
             , getXRView{ [windowProvider{ std::move(windowProvider) }] { return (__bridge MTKView*)windowProvider(); } }
