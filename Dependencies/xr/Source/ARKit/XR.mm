@@ -559,9 +559,11 @@ namespace xr {
         // The shader is used in two passes:
         // 1. Render the camera texture to the color render texture (see GetNextFrame).
         // 2. Render the composited texture to the screen (see DrawFrame).
+        //
         // NB: Use this shader as a reference for the BGRA to RGBA conversion.
         //      - The pixel channels might not need to be swapped at all. A straight copy from one texture to the other might do the swap automatically based on the texture formats.
         //      - Use Y CbCr camera format. (This shader does the conversion from Y CbCr to RGBA).
+        //
         constexpr char shaderSource[] = R"(
             #include <metal_stdlib>
             #include <simd/simd.h>
@@ -695,6 +697,9 @@ namespace xr {
 
         // NB: commandQueue is from bgfx.
         //      - Try creating your own command queue first but if you see crashes or artifacts in the render, use the existing bgfx command queue if this happens.
+        // Called from NativeXr::Impl::BeginSessionAsync() at Plugins/NativeXr/Source/NativeXr.cpp:520
+        //      void* graphicsContext = bgfx::getInternalData()->context
+        //      void* commandQueue = bgfx::getInternalData()->commandQueue
         Impl(System::Impl& systemImpl, void* graphicsContext, void* commandQueue, std::function<void*()> windowProvider)
             : SystemImpl{ systemImpl }
             , getXRView{ [windowProvider{ std::move(windowProvider) }] { return (__bridge MTKView*)windowProvider(); } }
