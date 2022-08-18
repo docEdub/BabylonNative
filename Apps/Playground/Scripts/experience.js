@@ -5,7 +5,7 @@
 
 var wireframe = false;
 var turntable = false;
-var logfps = true;
+var logfps = false;
 var ibl = false;
 var rtt = false;
 var vr = false;
