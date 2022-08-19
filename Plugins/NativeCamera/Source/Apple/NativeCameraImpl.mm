@@ -89,7 +89,6 @@ namespace Babylon::Plugins
             }
 
             fragment float4 fragmentShader(RasterizerData in [[stage_in]],
-                texture2d<float, access::sample> babylonTexture [[ texture(0) ]],
                 texture2d<float, access::sample> cameraTextureY [[ texture(1) ]],
                 texture2d<float, access::sample> cameraTextureCbCr [[ texture(2) ]])
             {
@@ -280,9 +279,8 @@ namespace Babylon::Plugins
         arcana::make_task(m_deviceContext->BeforeRenderScheduler(), arcana::cancellation::none(), [this, textureHandle] {
             if (m_implData->textureY && m_implData->textureCbCr && m_implData->textureRGBA)
             {
-                // Do the shader operation here for BGRA to RGBA.
+                // Do the shader operation here for YCrCb to RGBA.
                 //      - The override internal call would then only need to be done once when the texture is first setup in bgfx.
-                // bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureY));
 
                 m_implData->currentCommandBuffer = [m_implData->commandQueue commandBuffer];
                 m_implData->currentCommandBuffer.label = @"NativeCameraCommandBuffer";
@@ -309,7 +307,6 @@ namespace Babylon::Plugins
                     [renderEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
 
                     // Set the textures.
-                    [renderEncoder setFragmentTexture:m_implData->textureRGBA atIndex:0];
                     [renderEncoder setFragmentTexture:textureY atIndex:1];
                     [renderEncoder setFragmentTexture:textureCbCr atIndex:2];
 
@@ -328,6 +325,9 @@ namespace Babylon::Plugins
                         }
                     }];
                 }
+
+                // Finalize rendering here & push the command buffer to the GPU.
+                [m_implData->currentCommandBuffer commit];
 
                 bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureRGBA));
             }
@@ -374,11 +374,16 @@ namespace Babylon::Plugins
 
     size_t width = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0);
     size_t height = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0);
-    if (width != implData->width || height != implData->height) {
-        // TODO: Figure out if and how this texture is supposed to be freed.
-        MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:width height:height mipmapped:NO];
-        textureDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-        implData->textureRGBA = [implData->metalDevice newTextureWithDescriptor:textureDescriptor];
+    if (implData->width != width || implData->height != height) {
+        implData->width = width;
+        implData->height = height;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // TODO: Figure out if and how this texture is supposed to be freed.
+            MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:width height:height mipmapped:NO];
+            textureDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+            implData->textureRGBA = [implData->metalDevice newTextureWithDescriptor:textureDescriptor];
+        });
     }
 }
 
