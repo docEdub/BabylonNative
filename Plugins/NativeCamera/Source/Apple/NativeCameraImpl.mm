@@ -30,6 +30,98 @@
 
 namespace Babylon::Plugins
 {
+    namespace {
+        typedef struct {
+            vector_float2 position;
+            vector_float2 uv;
+            vector_float2 cameraUV;
+        } XRVertex;
+
+        static XRVertex vertices[] = {
+            // 2D positions, UV,        camera UV
+            { { -1, -1 },   { 0, 1 },   { 0, 1} },
+            { { -1, 1 },    { 0, 0 },   { 0, 0} },
+            { { 1, -1 },    { 1, 1 },   { 1, 1} },
+            { { 1, 1 },     { 1, 0 },   { 1, 0} },
+        };
+
+        // This shader is used to render *either* the camera texture or the final composited texture.
+        // It could be split into two shaders, but this is a bit simpler since they use the same structs
+        // and have some common logic.
+        // The shader is used in two passes:
+        // 1. Render the camera texture to the color render texture (see GetNextFrame).
+        // 2. Render the composited texture to the screen (see DrawFrame).
+        //
+        // NB: This is a copy/paste from Dependencies/xr/Source/ARKit/XR.mm:565
+        //
+        // NB: Use this shader as a reference for the BGRA to RGBA conversion.
+        //      - The pixel channels might not need to be swapped at all. A straight copy from one texture to the other might do the swap automatically based on the texture formats.
+        //      - Use Y CbCr camera format. (This shader does the conversion from Y CbCr to RGBA).
+        //
+        constexpr char shaderSource[] = R"(
+            #include <metal_stdlib>
+            #include <simd/simd.h>
+            using namespace metal;
+            #include <simd/simd.h>
+            typedef struct
+            {
+                vector_float2 position;
+                vector_float2 uv;
+                vector_float2 cameraUV;
+            } XRVertex;
+            typedef struct
+            {
+                float4 position [[position]];
+                float2 uv;
+                float2 cameraUV;
+            } RasterizerData;
+            vertex RasterizerData
+            vertexShader(uint vertexID [[vertex_id]],
+                         constant XRVertex *vertices [[buffer(0)]])
+            {
+                RasterizerData out;
+                out.position = vector_float4(vertices[vertexID].position.xy, 0.0, 1.0);
+                out.uv = vertices[vertexID].uv;
+                out.cameraUV = vertices[vertexID].cameraUV;
+                return out;
+            }
+            fragment float4 fragmentShader(RasterizerData in [[stage_in]],
+                texture2d<float, access::sample> cameraTextureY [[ texture(1) ]],
+                texture2d<float, access::sample> cameraTextureCbCr [[ texture(2) ]])
+            {
+                constexpr sampler linearSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
+                if (!is_null_texture(cameraTextureY) && !is_null_texture(cameraTextureCbCr))
+                {
+                    const float4 cameraSampleY = cameraTextureY.sample(linearSampler, in.cameraUV);
+                    const float4 cameraSampleCbCr = cameraTextureCbCr.sample(linearSampler, in.cameraUV);
+                    const float4x4 ycbcrToRGBTransform = float4x4(
+                        float4(+1.0000f, +1.0000f, +1.0000f, +0.0000f),
+                        float4(+0.0000f, -0.3441f, +1.7720f, +0.0000f),
+                        float4(+1.4020f, -0.7141f, +0.0000f, +0.0000f),
+                        float4(-0.7010f, +0.5291f, -0.8860f, +1.0000f)
+                    );
+                    float4 ycbcr = float4(cameraSampleY.r, cameraSampleCbCr.rg, 1.0);
+                    float4 cameraSample = ycbcrToRGBTransform * ycbcr;
+                    cameraSample.a = 1.0;
+                    return cameraSample;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        )";
+
+        id<MTLLibrary> CompileShader(id<MTLDevice> metalDevice, const char* source) {
+            NSError* error;
+            id<MTLLibrary> lib = [metalDevice newLibraryWithSource:@(source) options:nil error:&error];
+            if(nil != error) {
+                throw std::runtime_error{[error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]};
+            }
+            return lib;
+        }
+    }
+
     struct Camera::Impl::ImplData
     {
         ~ImplData()
@@ -47,7 +139,15 @@ namespace Babylon::Plugins
         CameraTextureDelegate* cameraTextureDelegate{};
         AVCaptureSession* avCaptureSession{};
         CVMetalTextureCacheRef textureCache{};
-        id <MTLTexture> textureBGRA{};
+        id<MTLTexture> textureY{};
+        id<MTLTexture> textureCbCr{};
+        id<MTLTexture> textureRGBA{};
+        id<MTLRenderPipelineState> cameraPipelineState{};
+        size_t width = 0;
+        size_t height = 0;
+        id<MTLDevice> metalDevice{};
+        id<MTLCommandQueue> commandQueue{};
+        id<MTLCommandBuffer> currentCommandBuffer{};
     };
     Camera::Impl::Impl(Napi::Env env, bool overrideCameraTexture)
         : m_deviceContext{nullptr}
@@ -63,14 +163,17 @@ namespace Babylon::Plugins
 
     arcana::task<void, std::exception_ptr> Camera::Impl::Open(uint32_t maxWidth, uint32_t maxHeight, bool frontCamera)
     {
+        m_implData->commandQueue = (id<MTLCommandQueue>)bgfx::getInternalData()->commandQueue;
+        m_implData->metalDevice = (id<MTLDevice>)bgfx::getInternalData()->context;
+
         if (maxWidth == 0 || maxWidth > std::numeric_limits<int32_t>::max()) {
             maxWidth = std::numeric_limits<int32_t>::max();
         }
         if (maxHeight == 0 || maxHeight > std::numeric_limits<int32_t>::max()) {
             maxHeight = std::numeric_limits<int32_t>::max();
         }
-        
-        auto metalDevice = (id<MTLDevice>)bgfx::getInternalData()->context;
+
+        auto metalDevice = m_implData->metalDevice;
 
         if (!m_deviceContext)
         {
@@ -89,6 +192,7 @@ namespace Babylon::Plugins
             AVCaptureDevice* bestDevice{nullptr};
             AVCaptureDeviceFormat* bestFormat{nullptr};
             uint32_t bestPixelCount{0};
+            NSNumber *bestPixelFormat{nil};
             uint32_t bestDimDiff{0};
             NSArray* deviceTypes{nullptr};
             bool foundExactMatch{false};
@@ -123,6 +227,7 @@ namespace Babylon::Plugins
                 {
                     CMVideoFormatDescriptionRef videoFormatRef{static_cast<CMVideoFormatDescriptionRef>(format.formatDescription)};
                     CMVideoDimensions dimensions{CMVideoFormatDescriptionGetDimensions(videoFormatRef)};
+                    auto pixelFormat = [NSNumber numberWithInt:CMFormatDescriptionGetMediaSubType(videoFormatRef)];
                     
                     // Reject any resolution that doesn't qualify for the constraint.
                     if (static_cast<uint32_t>(dimensions.width) > maxWidth || static_cast<uint32_t>(dimensions.height) > maxHeight)
@@ -136,6 +241,7 @@ namespace Babylon::Plugins
                     if (bestDevice == nullptr || pixelCount > bestPixelCount || (pixelCount == bestPixelCount && dimDiff < bestDimDiff))
                     {
                         bestPixelCount = pixelCount;
+                        bestPixelFormat = pixelFormat;
                         bestDevice = device;
                         bestFormat = format;
                         bestDimDiff = dimDiff;
@@ -171,7 +277,48 @@ namespace Babylon::Plugins
                 taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{"Failed to lock camera"})));
                 return;
             }
-            
+
+            NSDictionary *formats = [NSDictionary dictionaryWithObjectsAndKeys:
+                    @"kCVPixelFormatType_1Monochrome", [NSNumber numberWithInt:kCVPixelFormatType_1Monochrome],
+                    @"kCVPixelFormatType_2Indexed", [NSNumber numberWithInt:kCVPixelFormatType_2Indexed],
+                    @"kCVPixelFormatType_4Indexed", [NSNumber numberWithInt:kCVPixelFormatType_4Indexed],
+                    @"kCVPixelFormatType_8Indexed", [NSNumber numberWithInt:kCVPixelFormatType_8Indexed],
+                    @"kCVPixelFormatType_1IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_1IndexedGray_WhiteIsZero],
+                    @"kCVPixelFormatType_2IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_2IndexedGray_WhiteIsZero],
+                    @"kCVPixelFormatType_4IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_4IndexedGray_WhiteIsZero],
+                    @"kCVPixelFormatType_8IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_8IndexedGray_WhiteIsZero],
+                    @"kCVPixelFormatType_16BE555", [NSNumber numberWithInt:kCVPixelFormatType_16BE555],
+                    @"kCVPixelFormatType_16LE555", [NSNumber numberWithInt:kCVPixelFormatType_16LE555],
+                    @"kCVPixelFormatType_16LE5551", [NSNumber numberWithInt:kCVPixelFormatType_16LE5551],
+                    @"kCVPixelFormatType_16BE565", [NSNumber numberWithInt:kCVPixelFormatType_16BE565],
+                    @"kCVPixelFormatType_16LE565", [NSNumber numberWithInt:kCVPixelFormatType_16LE565],
+                    @"kCVPixelFormatType_24RGB", [NSNumber numberWithInt:kCVPixelFormatType_24RGB],
+                    @"kCVPixelFormatType_24BGR", [NSNumber numberWithInt:kCVPixelFormatType_24BGR],
+                    @"kCVPixelFormatType_32ARGB", [NSNumber numberWithInt:kCVPixelFormatType_32ARGB],
+                    @"kCVPixelFormatType_32BGRA", [NSNumber numberWithInt:kCVPixelFormatType_32BGRA],
+                    @"kCVPixelFormatType_32ABGR", [NSNumber numberWithInt:kCVPixelFormatType_32ABGR],
+                    @"kCVPixelFormatType_32RGBA", [NSNumber numberWithInt:kCVPixelFormatType_32RGBA],
+                    @"kCVPixelFormatType_64ARGB", [NSNumber numberWithInt:kCVPixelFormatType_64ARGB],
+                    @"kCVPixelFormatType_48RGB", [NSNumber numberWithInt:kCVPixelFormatType_48RGB],
+                    @"kCVPixelFormatType_32AlphaGray", [NSNumber numberWithInt:kCVPixelFormatType_32AlphaGray],
+                    @"kCVPixelFormatType_16Gray", [NSNumber numberWithInt:kCVPixelFormatType_16Gray],
+                    @"kCVPixelFormatType_422YpCbCr8", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8],
+                    @"kCVPixelFormatType_4444YpCbCrA8", [NSNumber numberWithInt:kCVPixelFormatType_4444YpCbCrA8],
+                    @"kCVPixelFormatType_4444YpCbCrA8R", [NSNumber numberWithInt:kCVPixelFormatType_4444YpCbCrA8R],
+                    @"kCVPixelFormatType_444YpCbCr8", [NSNumber numberWithInt:kCVPixelFormatType_444YpCbCr8],
+                    @"kCVPixelFormatType_422YpCbCr16", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr16],
+                    @"kCVPixelFormatType_422YpCbCr10", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr10],
+                    @"kCVPixelFormatType_444YpCbCr10", [NSNumber numberWithInt:kCVPixelFormatType_444YpCbCr10],
+                    @"kCVPixelFormatType_420YpCbCr8Planar", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8Planar],
+                    @"kCVPixelFormatType_420YpCbCr8PlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8PlanarFullRange],
+                    @"kCVPixelFormatType_422YpCbCr_4A_8BiPlanar", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr_4A_8BiPlanar],
+                    @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
+                    @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
+                    @"kCVPixelFormatType_422YpCbCr8_yuvs", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8_yuvs],
+                    @"kCVPixelFormatType_422YpCbCr8FullRange", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8FullRange],
+                nil];
+            NSLog(@"Using camera format %@", [formats objectForKey:bestPixelFormat]);
+
             [bestDevice setActiveFormat:bestFormat];
             AVCaptureDeviceInput *input{[AVCaptureDeviceInput deviceInputWithDevice:bestDevice error:&error]};
             [bestDevice unlockForConfiguration];
@@ -197,15 +344,36 @@ namespace Babylon::Plugins
             // Create the camera buffer.
             dispatch_queue_t sampleBufferQueue{dispatch_queue_create("CameraMulticaster", DISPATCH_QUEUE_SERIAL)};
             AVCaptureVideoDataOutput * dataOutput{[[AVCaptureVideoDataOutput alloc] init]};
+            NSArray<NSNumber*>* availableFormats = [dataOutput availableVideoCVPixelFormatTypes];
+            for (NSNumber* format : availableFormats) {
+                NSLog(@"%@", [formats objectForKey:format]);
+            }
             [dataOutput setAlwaysDiscardsLateVideoFrames:YES];
-            [dataOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA)}];
+            [dataOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey:bestPixelFormat}];
             [dataOutput setSampleBufferDelegate:m_implData->cameraTextureDelegate queue:sampleBufferQueue];
 
             // Actually start the camera session.
             [m_implData->avCaptureSession addOutput:dataOutput];
             [m_implData->avCaptureSession commitConfiguration];
             [m_implData->avCaptureSession startRunning];
-            
+
+            // Create a pipeline state for converting the camera output to RGBA.
+            id<MTLLibrary> lib = CompileShader(metalDevice, shaderSource);
+            id<MTLFunction> vertexFunction = [lib newFunctionWithName:@"vertexShader"];
+            id<MTLFunction> fragmentFunction = [lib newFunctionWithName:@"fragmentShader"];
+
+            MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+            pipelineStateDescriptor.label = @"Native Camera YCbCr to RGBA Pipeline";
+            pipelineStateDescriptor.vertexFunction = vertexFunction;
+            pipelineStateDescriptor.fragmentFunction = fragmentFunction;
+            pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            m_implData->cameraPipelineState = [metalDevice newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+            if (!m_implData->cameraPipelineState) {
+                taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{
+                    std::string("Failed to create camera pipeline state: ") + [static_cast<NSString *>(error.localizedDescription) UTF8String]})));
+                return;
+            }
+
             taskCompletionSource.complete();
         });
         
@@ -224,9 +392,56 @@ namespace Babylon::Plugins
     void Camera::Impl::UpdateCameraTexture(bgfx::TextureHandle textureHandle)
     {
         arcana::make_task(m_deviceContext->BeforeRenderScheduler(), arcana::cancellation::none(), [this, textureHandle] {
-            if (m_implData->textureBGRA)
+            if (m_implData->textureY && m_implData->textureCbCr && m_implData->textureRGBA)
             {
-                bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureBGRA));
+                m_implData->currentCommandBuffer = [m_implData->commandQueue commandBuffer];
+                m_implData->currentCommandBuffer.label = @"NativeCameraCommandBuffer";
+                MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+
+                // TODO: Maybe synchronize this like at Dependencies/xr/Source/ARKit/XR.mm:907?
+                id<MTLTexture> textureY = m_implData->textureY;
+                id<MTLTexture> textureCbCr = m_implData->textureCbCr;
+
+                if (renderPassDescriptor != nil) {
+                    // Attach the color texture, on which we'll draw the camera texture (so no need to clear on load).
+                    renderPassDescriptor.colorAttachments[0].texture = m_implData->textureRGBA;
+                    renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+                    renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+                    // Create and end the render encoder.
+                    id<MTLRenderCommandEncoder> renderEncoder = [m_implData->currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+                    renderEncoder.label = @"NativeCameraEncoder";
+
+                    // Set the shader pipeline.
+                    [renderEncoder setRenderPipelineState:m_implData->cameraPipelineState];
+
+                    // Set the vertex data.
+                    [renderEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+
+                    // Set the textures.
+                    [renderEncoder setFragmentTexture:textureY atIndex:1];
+                    [renderEncoder setFragmentTexture:textureCbCr atIndex:2];
+
+                    // Draw the triangles.
+                    [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+
+                    [renderEncoder endEncoding];
+
+                    [m_implData->currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) {
+                        if (textureY != nil) {
+                            [textureY setPurgeableState:MTLPurgeableStateEmpty];
+                        }
+
+                        if (textureCbCr != nil) {
+                            [textureCbCr setPurgeableState:MTLPurgeableStateEmpty];
+                        }
+                    }];
+                }
+
+                // Finalize rendering here & push the command buffer to the GPU.
+                [m_implData->currentCommandBuffer commit];
+
+                bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureRGBA));
             }
         });
     }
@@ -252,6 +467,12 @@ namespace Babylon::Plugins
     self->videoOrientation = AVCaptureVideoOrientationPortrait;
     self->orientationUpdated = false;
 #endif
+
+    id<MTLDevice> graphicsContext = (id<MTLDevice>)bgfx::getInternalData()->context;
+    CVReturn err = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, graphicsContext, nil, &implData->textureCache);
+    if (err) {
+        throw std::runtime_error{"Unable to create Texture Cache"};
+    }
 
     return self;
 }
@@ -317,26 +538,65 @@ namespace Babylon::Plugins
         self->orientationUpdated = false;
     }
 
-    CVPixelBufferRef pixelBuffer{CMSampleBufferGetImageBuffer(sampleBuffer)};
-    id<MTLTexture> textureBGRA{nil};
+    CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+
+    // Update both metal textures used by the renderer to display the camera image.
+    id<MTLTexture> textureY = [self getCameraTexture:pixelBuffer plane:0];
+    id<MTLTexture> textureCbCr = [self getCameraTexture:pixelBuffer plane:1];
+
+    if(textureY != nil && textureCbCr != nil)
+    {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            implData->textureY = textureY;
+            implData->textureCbCr = textureCbCr;
+        });
+    }
 
     size_t width = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0);
     size_t height = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0);
-    MTLPixelFormat pixelFormat{MTLPixelFormatBGRA8Unorm};
-    
-    CVMetalTextureRef texture{nullptr};
-    CVReturn status{CVMetalTextureCacheCreateTextureFromImage(nullptr, implData->textureCache, pixelBuffer, nullptr, pixelFormat, width, height, 0, &texture)};
-    if (status == kCVReturnSuccess)
-    {
-        textureBGRA = CVMetalTextureGetTexture(texture);
-        CFRelease(texture);
+    if (implData->width != width || implData->height != height) {
+        implData->width = width;
+        implData->height = height;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // TODO: Figure out if and how this texture is supposed to be freed.
+            MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:width height:height mipmapped:NO];
+            textureDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+            implData->textureRGBA = [implData->metalDevice newTextureWithDescriptor:textureDescriptor];
+        });
+    }
+}
+
+/**
+ Updates the captured texture with the current pixel buffer.
+*/
+- (id<MTLTexture>)getCameraTexture:(CVPixelBufferRef)pixelBuffer plane:(int)planeIndex {
+    CVReturn ret = CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+    if (ret != kCVReturnSuccess) {
+        return {};
     }
 
-    if (textureBGRA != nil)
-    {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            implData->textureBGRA = textureBGRA;
-        });
+    @try {
+        size_t planeWidth = CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex);
+        size_t planeHeight = CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex);
+
+        // Plane 0 is the Y plane, which is in R8Unorm format, and the second plane is the CBCR plane which is RG8Unorm format.
+        auto pixelFormat = planeIndex ? MTLPixelFormatRG8Unorm : MTLPixelFormatR8Unorm;
+        CVMetalTextureRef textureRef;
+
+        // Create a texture from the corresponding plane.
+        auto status = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, implData->textureCache, pixelBuffer, nil, pixelFormat, planeWidth, planeHeight, planeIndex, &textureRef);
+        if (status != kCVReturnSuccess) {
+            return nil;
+        }
+
+        id<MTLTexture> texture = CVMetalTextureGetTexture(textureRef);
+        CFRelease(textureRef);
+
+        return texture;
+    }
+    @finally {
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
     }
 }
 
