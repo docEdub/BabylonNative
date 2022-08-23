@@ -50,15 +50,14 @@ namespace Babylon::Plugins
         typedef struct {
             vector_float2 position;
             vector_float2 uv;
-            vector_float2 cameraUV;
         } XRVertex;
 
         static XRVertex vertices[] = {
-            // 2D positions, UV,        camera UV
-            { { -1, -1 },   { 0, 1 },   { 0, 1 } },
-            { { -1, 1 },    { 0, 0 },   { 0, 0 } },
-            { { 1, -1 },    { 1, 1 },   { 1, 1 } },
-            { { 1, 1 },     { 1, 0 },   { 1, 0 } },
+            // 2D positions, UV
+            { { -1, -1 },   { 0, 1 } },
+            { { -1, 1 },    { 0, 0 } },
+            { { 1, -1 },    { 1, 1 } },
+            { { 1, 1 },     { 1, 0 } },
         };
 
         constexpr char shaderSource[] = R"(
@@ -70,13 +69,11 @@ namespace Babylon::Plugins
             {
                 vector_float2 position;
                 vector_float2 uv;
-                vector_float2 cameraUV;
             } XRVertex;
             typedef struct
             {
                 float4 position [[position]];
                 float2 uv;
-                float2 cameraUV;
             } RasterizerData;
             vertex RasterizerData
             vertexShader(uint vertexID [[vertex_id]],
@@ -85,7 +82,6 @@ namespace Babylon::Plugins
                 RasterizerData out;
                 out.position = vector_float4(vertices[vertexID].position.xy, 0.0, 1.0);
                 out.uv = vertices[vertexID].uv;
-                out.cameraUV = vertices[vertexID].cameraUV;
                 return out;
             }
             fragment float4 fragmentShader(RasterizerData in [[stage_in]],
@@ -95,8 +91,8 @@ namespace Babylon::Plugins
                 constexpr sampler linearSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
                 if (!is_null_texture(cameraTextureY) && !is_null_texture(cameraTextureCbCr))
                 {
-                    const float4 cameraSampleY = cameraTextureY.sample(linearSampler, in.cameraUV);
-                    const float4 cameraSampleCbCr = cameraTextureCbCr.sample(linearSampler, in.cameraUV);
+                    const float4 cameraSampleY = cameraTextureY.sample(linearSampler, in.uv);
+                    const float4 cameraSampleCbCr = cameraTextureCbCr.sample(linearSampler, in.uv);
                     const float4x4 ycbcrToRGBTransform = float4x4(
                         float4(+1.0000f, +1.0000f, +1.0000f, +0.0000f),
                         float4(+0.0000f, -0.3441f, +1.7720f, +0.0000f),
