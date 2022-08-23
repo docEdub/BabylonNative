@@ -31,6 +31,22 @@
 namespace Babylon::Plugins
 {
     namespace {
+        static NSDictionary *supportedPixelFormats = [NSDictionary dictionaryWithObjectsAndKeys:
+            @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
+            @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
+            nil];
+
+
+        static bool isPixelFormatSupported(NSNumber *pixelFormat)
+        {
+            return [supportedPixelFormats objectForKey:pixelFormat] != nullptr;
+        }
+
+        NSString *pixelFormatString(NSNumber *pixelFormat)
+        {
+            return [supportedPixelFormats objectForKey:pixelFormat];
+        }
+
         typedef struct {
             vector_float2 position;
             vector_float2 uv;
@@ -39,25 +55,12 @@ namespace Babylon::Plugins
 
         static XRVertex vertices[] = {
             // 2D positions, UV,        camera UV
-            { { -1, -1 },   { 0, 1 },   { 0, 1} },
-            { { -1, 1 },    { 0, 0 },   { 0, 0} },
-            { { 1, -1 },    { 1, 1 },   { 1, 1} },
-            { { 1, 1 },     { 1, 0 },   { 1, 0} },
+            { { -1, -1 },   { 0, 1 },   { 0, 1 } },
+            { { -1, 1 },    { 0, 0 },   { 0, 0 } },
+            { { 1, -1 },    { 1, 1 },   { 1, 1 } },
+            { { 1, 1 },     { 1, 0 },   { 1, 0 } },
         };
 
-        // This shader is used to render *either* the camera texture or the final composited texture.
-        // It could be split into two shaders, but this is a bit simpler since they use the same structs
-        // and have some common logic.
-        // The shader is used in two passes:
-        // 1. Render the camera texture to the color render texture (see GetNextFrame).
-        // 2. Render the composited texture to the screen (see DrawFrame).
-        //
-        // NB: This is a copy/paste from Dependencies/xr/Source/ARKit/XR.mm:565
-        //
-        // NB: Use this shader as a reference for the BGRA to RGBA conversion.
-        //      - The pixel channels might not need to be swapped at all. A straight copy from one texture to the other might do the swap automatically based on the texture formats.
-        //      - Use Y CbCr camera format. (This shader does the conversion from Y CbCr to RGBA).
-        //
         constexpr char shaderSource[] = R"(
             #include <metal_stdlib>
             #include <simd/simd.h>
@@ -227,7 +230,14 @@ namespace Babylon::Plugins
                 {
                     CMVideoFormatDescriptionRef videoFormatRef{static_cast<CMVideoFormatDescriptionRef>(format.formatDescription)};
                     CMVideoDimensions dimensions{CMVideoFormatDescriptionGetDimensions(videoFormatRef)};
+
+                    // Reject pixel formats we don't support.
                     auto pixelFormat = [NSNumber numberWithInt:CMFormatDescriptionGetMediaSubType(videoFormatRef)];
+                    if (!isPixelFormatSupported(pixelFormat))
+                    {
+                        NSLog(@"Pixel format %@ is not supported", pixelFormatString(pixelFormat));
+                        continue;
+                    }
                     
                     // Reject any resolution that doesn't qualify for the constraint.
                     if (static_cast<uint32_t>(dimensions.width) > maxWidth || static_cast<uint32_t>(dimensions.height) > maxHeight)
@@ -278,46 +288,7 @@ namespace Babylon::Plugins
                 return;
             }
 
-            NSDictionary *formats = [NSDictionary dictionaryWithObjectsAndKeys:
-                    @"kCVPixelFormatType_1Monochrome", [NSNumber numberWithInt:kCVPixelFormatType_1Monochrome],
-                    @"kCVPixelFormatType_2Indexed", [NSNumber numberWithInt:kCVPixelFormatType_2Indexed],
-                    @"kCVPixelFormatType_4Indexed", [NSNumber numberWithInt:kCVPixelFormatType_4Indexed],
-                    @"kCVPixelFormatType_8Indexed", [NSNumber numberWithInt:kCVPixelFormatType_8Indexed],
-                    @"kCVPixelFormatType_1IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_1IndexedGray_WhiteIsZero],
-                    @"kCVPixelFormatType_2IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_2IndexedGray_WhiteIsZero],
-                    @"kCVPixelFormatType_4IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_4IndexedGray_WhiteIsZero],
-                    @"kCVPixelFormatType_8IndexedGray_WhiteIsZero", [NSNumber numberWithInt:kCVPixelFormatType_8IndexedGray_WhiteIsZero],
-                    @"kCVPixelFormatType_16BE555", [NSNumber numberWithInt:kCVPixelFormatType_16BE555],
-                    @"kCVPixelFormatType_16LE555", [NSNumber numberWithInt:kCVPixelFormatType_16LE555],
-                    @"kCVPixelFormatType_16LE5551", [NSNumber numberWithInt:kCVPixelFormatType_16LE5551],
-                    @"kCVPixelFormatType_16BE565", [NSNumber numberWithInt:kCVPixelFormatType_16BE565],
-                    @"kCVPixelFormatType_16LE565", [NSNumber numberWithInt:kCVPixelFormatType_16LE565],
-                    @"kCVPixelFormatType_24RGB", [NSNumber numberWithInt:kCVPixelFormatType_24RGB],
-                    @"kCVPixelFormatType_24BGR", [NSNumber numberWithInt:kCVPixelFormatType_24BGR],
-                    @"kCVPixelFormatType_32ARGB", [NSNumber numberWithInt:kCVPixelFormatType_32ARGB],
-                    @"kCVPixelFormatType_32BGRA", [NSNumber numberWithInt:kCVPixelFormatType_32BGRA],
-                    @"kCVPixelFormatType_32ABGR", [NSNumber numberWithInt:kCVPixelFormatType_32ABGR],
-                    @"kCVPixelFormatType_32RGBA", [NSNumber numberWithInt:kCVPixelFormatType_32RGBA],
-                    @"kCVPixelFormatType_64ARGB", [NSNumber numberWithInt:kCVPixelFormatType_64ARGB],
-                    @"kCVPixelFormatType_48RGB", [NSNumber numberWithInt:kCVPixelFormatType_48RGB],
-                    @"kCVPixelFormatType_32AlphaGray", [NSNumber numberWithInt:kCVPixelFormatType_32AlphaGray],
-                    @"kCVPixelFormatType_16Gray", [NSNumber numberWithInt:kCVPixelFormatType_16Gray],
-                    @"kCVPixelFormatType_422YpCbCr8", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8],
-                    @"kCVPixelFormatType_4444YpCbCrA8", [NSNumber numberWithInt:kCVPixelFormatType_4444YpCbCrA8],
-                    @"kCVPixelFormatType_4444YpCbCrA8R", [NSNumber numberWithInt:kCVPixelFormatType_4444YpCbCrA8R],
-                    @"kCVPixelFormatType_444YpCbCr8", [NSNumber numberWithInt:kCVPixelFormatType_444YpCbCr8],
-                    @"kCVPixelFormatType_422YpCbCr16", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr16],
-                    @"kCVPixelFormatType_422YpCbCr10", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr10],
-                    @"kCVPixelFormatType_444YpCbCr10", [NSNumber numberWithInt:kCVPixelFormatType_444YpCbCr10],
-                    @"kCVPixelFormatType_420YpCbCr8Planar", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8Planar],
-                    @"kCVPixelFormatType_420YpCbCr8PlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8PlanarFullRange],
-                    @"kCVPixelFormatType_422YpCbCr_4A_8BiPlanar", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr_4A_8BiPlanar],
-                    @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
-                    @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
-                    @"kCVPixelFormatType_422YpCbCr8_yuvs", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8_yuvs],
-                    @"kCVPixelFormatType_422YpCbCr8FullRange", [NSNumber numberWithInt:kCVPixelFormatType_422YpCbCr8FullRange],
-                nil];
-            NSLog(@"Using camera format %@", [formats objectForKey:bestPixelFormat]);
+            NSLog(@"Using camera pixel format %@", pixelFormatString(bestPixelFormat));
 
             [bestDevice setActiveFormat:bestFormat];
             AVCaptureDeviceInput *input{[AVCaptureDeviceInput deviceInputWithDevice:bestDevice error:&error]};
@@ -344,10 +315,6 @@ namespace Babylon::Plugins
             // Create the camera buffer.
             dispatch_queue_t sampleBufferQueue{dispatch_queue_create("CameraMulticaster", DISPATCH_QUEUE_SERIAL)};
             AVCaptureVideoDataOutput * dataOutput{[[AVCaptureVideoDataOutput alloc] init]};
-            NSArray<NSNumber*>* availableFormats = [dataOutput availableVideoCVPixelFormatTypes];
-            for (NSNumber* format : availableFormats) {
-                NSLog(@"%@", [formats objectForKey:format]);
-            }
             [dataOutput setAlwaysDiscardsLateVideoFrames:YES];
             [dataOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey:bestPixelFormat}];
             [dataOutput setSampleBufferDelegate:m_implData->cameraTextureDelegate queue:sampleBufferQueue];
@@ -559,7 +526,6 @@ namespace Babylon::Plugins
         implData->height = height;
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            // TODO: Figure out if and how this texture is supposed to be freed.
             MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:width height:height mipmapped:NO];
             textureDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
             implData->textureRGBA = [implData->metalDevice newTextureWithDescriptor:textureDescriptor];
