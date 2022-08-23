@@ -231,7 +231,6 @@ namespace Babylon::Plugins
                     auto pixelFormat = [NSNumber numberWithInt:CMFormatDescriptionGetMediaSubType(videoFormatRef)];
                     if (!isPixelFormatSupported(pixelFormat))
                     {
-                        NSLog(@"Pixel format %@ is not supported", pixelFormatString(pixelFormat));
                         continue;
                     }
                     
