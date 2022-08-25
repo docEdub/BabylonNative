@@ -331,6 +331,7 @@ namespace Babylon::Plugins
             pipelineStateDescriptor.fragmentFunction = fragmentFunction;
             pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
             m_implData->cameraPipelineState = [metalDevice newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+            [pipelineStateDescriptor release];
             if (!m_implData->cameraPipelineState) {
                 taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{
                     std::string("Failed to create camera pipeline state: ") + [static_cast<NSString *>(error.localizedDescription) UTF8String]})));
