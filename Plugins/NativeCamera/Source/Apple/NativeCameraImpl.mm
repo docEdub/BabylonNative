@@ -338,7 +338,7 @@ namespace Babylon::Plugins
 
             if (!m_implData->cameraPipelineState) {
                 taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{
-                    std::string("Failed to create camera pipeline state: ") + [static_cast<NSString *>(error.localizedDescription) UTF8String]})));
+                    std::string("Failed to create camera pipeline state: ") + [error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]})));
                 return;
             }
 
