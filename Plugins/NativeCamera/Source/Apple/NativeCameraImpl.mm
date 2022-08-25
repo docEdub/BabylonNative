@@ -128,9 +128,6 @@ namespace Babylon::Plugins
     {
         ~ImplData()
         {
-            [avCaptureSession stopRunning];
-            [avCaptureSession release];
-            [cameraTextureDelegate release];
             if (textureCache)
             {
                 CVMetalTextureCacheFlush(textureCache, 0);
@@ -166,8 +163,8 @@ namespace Babylon::Plugins
 
     arcana::task<void, std::exception_ptr> Camera::Impl::Open(uint32_t maxWidth, uint32_t maxHeight, bool frontCamera)
     {
-        m_implData->commandQueue = (id<MTLCommandQueue>)bgfx::getInternalData()->commandQueue;
-        m_implData->metalDevice = (id<MTLDevice>)bgfx::getInternalData()->context;
+        m_implData->commandQueue = (__bridge id<MTLCommandQueue>)bgfx::getInternalData()->commandQueue;
+        m_implData->metalDevice = (__bridge id<MTLDevice>)bgfx::getInternalData()->context;
 
         if (maxWidth == 0 || maxWidth > std::numeric_limits<int32_t>::max()) {
             maxWidth = std::numeric_limits<int32_t>::max();
@@ -236,8 +233,6 @@ namespace Babylon::Plugins
                     auto pixelFormat = [NSNumber numberWithInt:CMFormatDescriptionGetMediaSubType(videoFormatRef)];
                     CFRelease(videoFormatRef);
                     auto isSupported = isPixelFormatSupported(pixelFormat);
-                    [pixelFormat release];
-                    [pixelFormat release];
                     if (!isSupported)
                     {
                         continue;
@@ -256,7 +251,6 @@ namespace Babylon::Plugins
                     {
                         bestPixelCount = pixelCount;
                         bestPixelFormat = pixelFormat;
-                        [pixelFormat release];
                         bestDevice = device;
                         bestFormat = format;
                         bestDimDiff = dimDiff;
@@ -322,8 +316,6 @@ namespace Babylon::Plugins
             AVCaptureVideoDataOutput * dataOutput{[[AVCaptureVideoDataOutput alloc] init]};
             [dataOutput setAlwaysDiscardsLateVideoFrames:YES];
             [dataOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey:bestPixelFormat}];
-            [bestPixelFormat release];
-            [bestPixelFormat release];
             [dataOutput setSampleBufferDelegate:m_implData->cameraTextureDelegate queue:sampleBufferQueue];
 
             // Actually start the camera session.
@@ -343,10 +335,6 @@ namespace Babylon::Plugins
             pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
             m_implData->cameraPipelineState = [metalDevice newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
 
-            [pipelineStateDescriptor release];
-            [fragmentFunction release];
-            [vertexFunction release];
-            [lib release];
 
             if (!m_implData->cameraPipelineState) {
                 taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{
@@ -404,7 +392,7 @@ namespace Babylon::Plugins
     self->orientationUpdated = false;
 #endif
 
-    id<MTLDevice> graphicsContext = (id<MTLDevice>)bgfx::getInternalData()->context;
+    id<MTLDevice> graphicsContext = (__bridge id<MTLDevice>)bgfx::getInternalData()->context;
     CVReturn err = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, graphicsContext, nil, &implData->textureCache);
     if (err) {
         throw std::runtime_error{"Unable to create Texture Cache"};
