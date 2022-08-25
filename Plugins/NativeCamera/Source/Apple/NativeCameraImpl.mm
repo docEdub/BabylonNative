@@ -30,95 +30,93 @@
 
 namespace Babylon::Plugins
 {
-    namespace {
-        static NSDictionary *supportedPixelFormats = [NSDictionary dictionaryWithObjectsAndKeys:
-            @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
-            @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
-            nil];
+    static NSDictionary *supportedPixelFormats = [NSDictionary dictionaryWithObjectsAndKeys:
+        @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
+        @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
+        nil];
 
 
-        static bool isPixelFormatSupported(NSNumber *pixelFormat)
+    static bool isPixelFormatSupported(NSNumber *pixelFormat)
+    {
+        return [supportedPixelFormats objectForKey:pixelFormat] != nullptr;
+    }
+
+    NSString *pixelFormatString(NSNumber *pixelFormat)
+    {
+        return [supportedPixelFormats objectForKey:pixelFormat];
+    }
+
+    typedef struct {
+        vector_float2 position;
+        vector_float2 uv;
+    } XRVertex;
+
+    static XRVertex vertices[] = {
+        // 2D positions, UV
+        { { -1, -1 },   { 0, 1 } },
+        { { -1, 1 },    { 0, 0 } },
+        { { 1, -1 },    { 1, 1 } },
+        { { 1, 1 },     { 1, 0 } },
+    };
+
+    constexpr char shaderSource[] = R"(
+        #include <metal_stdlib>
+        #include <simd/simd.h>
+        using namespace metal;
+        #include <simd/simd.h>
+        typedef struct
         {
-            return [supportedPixelFormats objectForKey:pixelFormat] != nullptr;
-        }
-
-        NSString *pixelFormatString(NSNumber *pixelFormat)
-        {
-            return [supportedPixelFormats objectForKey:pixelFormat];
-        }
-
-        typedef struct {
             vector_float2 position;
             vector_float2 uv;
         } XRVertex;
-
-        static XRVertex vertices[] = {
-            // 2D positions, UV
-            { { -1, -1 },   { 0, 1 } },
-            { { -1, 1 },    { 0, 0 } },
-            { { 1, -1 },    { 1, 1 } },
-            { { 1, 1 },     { 1, 0 } },
-        };
-
-        constexpr char shaderSource[] = R"(
-            #include <metal_stdlib>
-            #include <simd/simd.h>
-            using namespace metal;
-            #include <simd/simd.h>
-            typedef struct
-            {
-                vector_float2 position;
-                vector_float2 uv;
-            } XRVertex;
-            typedef struct
-            {
-                float4 position [[position]];
-                float2 uv;
-            } RasterizerData;
-            vertex RasterizerData
-            vertexShader(uint vertexID [[vertex_id]],
-                         constant XRVertex *vertices [[buffer(0)]])
-            {
-                RasterizerData out;
-                out.position = vector_float4(vertices[vertexID].position.xy, 0.0, 1.0);
-                out.uv = vertices[vertexID].uv;
-                return out;
-            }
-            fragment float4 fragmentShader(RasterizerData in [[stage_in]],
-                texture2d<float, access::sample> cameraTextureY [[ texture(1) ]],
-                texture2d<float, access::sample> cameraTextureCbCr [[ texture(2) ]])
-            {
-                constexpr sampler linearSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
-                if (!is_null_texture(cameraTextureY) && !is_null_texture(cameraTextureCbCr))
-                {
-                    const float4 cameraSampleY = cameraTextureY.sample(linearSampler, in.uv);
-                    const float4 cameraSampleCbCr = cameraTextureCbCr.sample(linearSampler, in.uv);
-                    const float4x4 ycbcrToRGBTransform = float4x4(
-                        float4(+1.0000f, +1.0000f, +1.0000f, +0.0000f),
-                        float4(+0.0000f, -0.3441f, +1.7720f, +0.0000f),
-                        float4(+1.4020f, -0.7141f, +0.0000f, +0.0000f),
-                        float4(-0.7010f, +0.5291f, -0.8860f, +1.0000f)
-                    );
-                    float4 ycbcr = float4(cameraSampleY.r, cameraSampleCbCr.rg, 1.0);
-                    float4 cameraSample = ycbcrToRGBTransform * ycbcr;
-                    cameraSample.a = 1.0;
-                    return cameraSample;
-                }
-                else
-                {
-                    return 0;
-                }
-            }
-        )";
-
-        id<MTLLibrary> CompileShader(id<MTLDevice> metalDevice, const char* source) {
-            NSError* error;
-            id<MTLLibrary> lib = [metalDevice newLibraryWithSource:@(source) options:nil error:&error];
-            if(nil != error) {
-                throw std::runtime_error{[error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]};
-            }
-            return lib;
+        typedef struct
+        {
+            float4 position [[position]];
+            float2 uv;
+        } RasterizerData;
+        vertex RasterizerData
+        vertexShader(uint vertexID [[vertex_id]],
+                        constant XRVertex *vertices [[buffer(0)]])
+        {
+            RasterizerData out;
+            out.position = vector_float4(vertices[vertexID].position.xy, 0.0, 1.0);
+            out.uv = vertices[vertexID].uv;
+            return out;
         }
+        fragment float4 fragmentShader(RasterizerData in [[stage_in]],
+            texture2d<float, access::sample> cameraTextureY [[ texture(1) ]],
+            texture2d<float, access::sample> cameraTextureCbCr [[ texture(2) ]])
+        {
+            constexpr sampler linearSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
+            if (!is_null_texture(cameraTextureY) && !is_null_texture(cameraTextureCbCr))
+            {
+                const float4 cameraSampleY = cameraTextureY.sample(linearSampler, in.uv);
+                const float4 cameraSampleCbCr = cameraTextureCbCr.sample(linearSampler, in.uv);
+                const float4x4 ycbcrToRGBTransform = float4x4(
+                    float4(+1.0000f, +1.0000f, +1.0000f, +0.0000f),
+                    float4(+0.0000f, -0.3441f, +1.7720f, +0.0000f),
+                    float4(+1.4020f, -0.7141f, +0.0000f, +0.0000f),
+                    float4(-0.7010f, +0.5291f, -0.8860f, +1.0000f)
+                );
+                float4 ycbcr = float4(cameraSampleY.r, cameraSampleCbCr.rg, 1.0);
+                float4 cameraSample = ycbcrToRGBTransform * ycbcr;
+                cameraSample.a = 1.0;
+                return cameraSample;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+    )";
+
+    id<MTLLibrary> CompileShader(id<MTLDevice> metalDevice, const char* source) {
+        NSError* error;
+        id<MTLLibrary> lib = [metalDevice newLibraryWithSource:@(source) options:nil error:&error];
+        if(nil != error) {
+            throw std::runtime_error{[error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]};
+        }
+        return lib;
     }
 
     struct Camera::Impl::ImplData
@@ -356,63 +354,8 @@ namespace Babylon::Plugins
     void Camera::Impl::UpdateCameraTexture(bgfx::TextureHandle textureHandle)
     {
         arcana::make_task(m_deviceContext->BeforeRenderScheduler(), arcana::cancellation::none(), [this, textureHandle] {
-            if (m_implData->textureY && m_implData->textureCbCr && m_implData->textureRGBA)
-            {
-                m_implData->currentCommandBuffer = [m_implData->commandQueue commandBuffer];
-                m_implData->currentCommandBuffer.label = @"NativeCameraCommandBuffer";
-                MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-
-                id<MTLTexture> textureY = nil;
-                id<MTLTexture> textureCbCr = nil;
-                id<MTLTexture> textureRGBA = nil;
-                bool overrideBgfxTexture = false;
-                @synchronized(m_implData->cameraTextureDelegate) {
-                    textureY = m_implData->textureY;
-                    textureCbCr = m_implData->textureCbCr;
-                    textureRGBA = m_implData->textureRGBA;
-                    overrideBgfxTexture = m_implData->overrideBgfxTexture;
-                }
-
-                if (renderPassDescriptor != nil) {
-                    // Attach the color texture, on which we'll draw the camera texture (so no need to clear on load).
-                    renderPassDescriptor.colorAttachments[0].texture = textureRGBA;
-                    renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionDontCare;
-                    renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-
-                    // Create and end the render encoder.
-                    id<MTLRenderCommandEncoder> renderEncoder = [m_implData->currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-                    renderEncoder.label = @"NativeCameraEncoder";
-
-                    // Set the shader pipeline.
-                    [renderEncoder setRenderPipelineState:m_implData->cameraPipelineState];
-
-                    // Set the vertex data.
-                    [renderEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
-
-                    // Set the textures.
-                    [renderEncoder setFragmentTexture:textureY atIndex:1];
-                    [renderEncoder setFragmentTexture:textureCbCr atIndex:2];
-
-                    // Draw the triangles.
-                    [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
-
-                    [renderEncoder endEncoding];
-
-                    [m_implData->currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) {
-                        if (textureY != nil) {
-                            [textureY setPurgeableState:MTLPurgeableStateEmpty];
-                        }
-
-                        if (textureCbCr != nil) {
-                            [textureCbCr setPurgeableState:MTLPurgeableStateEmpty];
-                        }
-                    }];
-                }
-
-                // Finalize rendering here & push the command buffer to the GPU.
-                [m_implData->currentCommandBuffer commit];
-
-                if (overrideBgfxTexture)
+            @synchronized(m_implData->cameraTextureDelegate) {
+                if (m_implData->overrideBgfxTexture && m_implData->textureRGBA != nil)
                 {
                     bgfx::overrideInternal(textureHandle, reinterpret_cast<uintptr_t>(m_implData->textureRGBA));
                     m_implData->overrideBgfxTexture = false;
@@ -536,6 +479,52 @@ namespace Babylon::Plugins
                 implData->overrideBgfxTexture = true;
             }
         };
+
+        if (implData->textureRGBA != nil)
+        {
+            implData->currentCommandBuffer = [implData->commandQueue commandBuffer];
+            implData->currentCommandBuffer.label = @"NativeCameraCommandBuffer";
+            MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+
+            if (renderPassDescriptor != nil) {
+                // Attach the color texture, on which we'll draw the camera texture (so no need to clear on load).
+                renderPassDescriptor.colorAttachments[0].texture = implData->textureRGBA;
+                renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+                renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+                // Create and end the render encoder.
+                id<MTLRenderCommandEncoder> renderEncoder = [implData->currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+                renderEncoder.label = @"NativeCameraEncoder";
+
+                // Set the shader pipeline.
+                [renderEncoder setRenderPipelineState:implData->cameraPipelineState];
+
+                // Set the vertex data.
+                [renderEncoder setVertexBytes:Babylon::Plugins::vertices length:sizeof(Babylon::Plugins::vertices) atIndex:0];
+
+                // Set the textures.
+                [renderEncoder setFragmentTexture:textureY atIndex:1];
+                [renderEncoder setFragmentTexture:textureCbCr atIndex:2];
+
+                // Draw the triangles.
+                [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+
+                [renderEncoder endEncoding];
+
+                [implData->currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) {
+                    if (textureY != nil) {
+                        [textureY setPurgeableState:MTLPurgeableStateEmpty];
+                    }
+
+                    if (textureCbCr != nil) {
+                        [textureCbCr setPurgeableState:MTLPurgeableStateEmpty];
+                    }
+                }];
+            }
+
+            // Finalize rendering here & push the command buffer to the GPU.
+            [implData->currentCommandBuffer commit];
+        }
     }
 }
 
