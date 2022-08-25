@@ -30,21 +30,22 @@
 
 namespace Babylon::Plugins
 {
-    static NSDictionary *supportedPixelFormats = [NSDictionary dictionaryWithObjectsAndKeys:
-        @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
-        @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
-        nil];
+    // static NSDictionary *supportedPixelFormats = [NSDictionary dictionaryWithObjectsAndKeys:
+    //     @"kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange],
+    //     @"kCVPixelFormatType_420YpCbCr8BiPlanarFullRange", [NSNumber numberWithInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange],
+    //     nil];
 
 
     static bool isPixelFormatSupported(NSNumber *pixelFormat)
     {
-        return [supportedPixelFormats objectForKey:pixelFormat] != nullptr;
+        (void)pixelFormat;
+        return true;//[supportedPixelFormats objectForKey:pixelFormat] != nullptr;
     }
 
-    NSString *pixelFormatString(NSNumber *pixelFormat)
-    {
-        return [supportedPixelFormats objectForKey:pixelFormat];
-    }
+    // NSString *pixelFormatString(NSNumber *pixelFormat)
+    // {
+    //     return [supportedPixelFormats objectForKey:pixelFormat];
+    // }
 
     typedef struct {
         vector_float2 position;
@@ -227,8 +228,13 @@ namespace Babylon::Plugins
                     CMVideoDimensions dimensions{CMVideoFormatDescriptionGetDimensions(videoFormatRef)};
 
                     // Reject pixel formats we don't support.
+                    // auto pixelFormatFourCC = CMFormatDescriptionGetMediaSubType(videoFormatRef);
                     auto pixelFormat = [NSNumber numberWithInt:CMFormatDescriptionGetMediaSubType(videoFormatRef)];
-                    if (!isPixelFormatSupported(pixelFormat))
+                    CFRelease(videoFormatRef);
+                    auto isSupported = isPixelFormatSupported(pixelFormat);
+                    [pixelFormat release];
+                    [pixelFormat release];
+                    if (!isSupported)
                     {
                         continue;
                     }
@@ -246,6 +252,7 @@ namespace Babylon::Plugins
                     {
                         bestPixelCount = pixelCount;
                         bestPixelFormat = pixelFormat;
+                        [pixelFormat release];
                         bestDevice = device;
                         bestFormat = format;
                         bestDimDiff = dimDiff;
@@ -282,7 +289,7 @@ namespace Babylon::Plugins
                 return;
             }
 
-            NSLog(@"Using camera pixel format %@", pixelFormatString(bestPixelFormat));
+            // NSLog(@"Using camera pixel format %@", pixelFormatString(bestPixelFormat));
 
             [bestDevice setActiveFormat:bestFormat];
             AVCaptureDeviceInput *input{[AVCaptureDeviceInput deviceInputWithDevice:bestDevice error:&error]};
@@ -311,6 +318,8 @@ namespace Babylon::Plugins
             AVCaptureVideoDataOutput * dataOutput{[[AVCaptureVideoDataOutput alloc] init]};
             [dataOutput setAlwaysDiscardsLateVideoFrames:YES];
             [dataOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey:bestPixelFormat}];
+            [bestPixelFormat release];
+            [bestPixelFormat release];
             [dataOutput setSampleBufferDelegate:m_implData->cameraTextureDelegate queue:sampleBufferQueue];
 
             // Actually start the camera session.
@@ -329,7 +338,12 @@ namespace Babylon::Plugins
             pipelineStateDescriptor.fragmentFunction = fragmentFunction;
             pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
             m_implData->cameraPipelineState = [metalDevice newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+
             [pipelineStateDescriptor release];
+            [fragmentFunction release];
+            [vertexFunction release];
+            [lib release];
+
             if (!m_implData->cameraPipelineState) {
                 taskCompletionSource.complete(arcana::make_unexpected(std::make_exception_ptr(std::runtime_error{
                     std::string("Failed to create camera pipeline state: ") + [static_cast<NSString *>(error.localizedDescription) UTF8String]})));
