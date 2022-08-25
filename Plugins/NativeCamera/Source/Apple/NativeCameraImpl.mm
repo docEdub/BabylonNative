@@ -192,7 +192,7 @@ namespace Babylon::Plugins
             AVCaptureDevice* bestDevice{nullptr};
             AVCaptureDeviceFormat* bestFormat{nullptr};
             uint32_t bestPixelCount{0};
-            NSNumber *bestPixelFormat{nil};
+            NSNumber* bestPixelFormat{nil};
             uint32_t bestDimDiff{0};
             NSArray* deviceTypes{nullptr};
             bool foundExactMatch{false};
