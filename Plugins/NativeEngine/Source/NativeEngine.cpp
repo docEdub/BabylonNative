@@ -488,6 +488,8 @@ namespace Babylon
 
                 // REVIEW: Should this be here if only used by ValidationTest?
                 InstanceMethod("getFrameBufferData", &NativeEngine::GetFrameBufferData),
+
+                InstanceMethod("letTextureLoadingProceed", &NativeEngine::LetTextureLoadingProceed),
             });
         // clang-format on
 
@@ -520,6 +522,7 @@ namespace Babylon
     void NativeEngine::Dispose()
     {
         m_cancellationSource->cancel();
+        memset((void*)&m_allocator, 0, sizeof(m_allocator));
     }
 
     void NativeEngine::Dispose(const Napi::CallbackInfo& /*info*/)
@@ -1048,6 +1051,10 @@ namespace Babylon
 
         arcana::make_task(arcana::threadpool_scheduler, *m_cancellationSource,
             [this, dataSpan, generateMips, invertY, srgb, texture, cancellationSource{m_cancellationSource}]() {
+                while (!m_letTextureLoadingProceed) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
                 bimg::ImageContainer* image{ParseImage(m_allocator, dataSpan)};
                 image = PrepareImage(m_allocator, image, invertY, srgb, generateMips);
                 LoadTextureFromImage(texture, image, srgb);
@@ -1913,5 +1920,11 @@ namespace Babylon
                 }
             });
         });
+    }
+
+    void NativeEngine::LetTextureLoadingProceed(const Napi::CallbackInfo& info)
+    {
+        JsConsoleLogger::LogInfo(info.Env(), "NativeEngine::LetTextureLoadingProceed(...) called.");
+        m_letTextureLoadingProceed = true;
     }
 }

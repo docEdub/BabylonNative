@@ -237,5 +237,8 @@ namespace Babylon
 
         // TODO: This should be changed to a non-owning ref once multi-update is available.
         NativeDataStream* m_commandStream{};
+
+        void LetTextureLoadingProceed(const Napi::CallbackInfo& info);
+        bool m_letTextureLoadingProceed{false};
     };
 }
