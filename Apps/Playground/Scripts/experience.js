@@ -17,7 +17,7 @@ var text = false;
 var hololens = false;
 var cameraTexture = false;
 var imageTracking = false;
-const readPixels = false;
+const readPixels = true;
 
 function CreateBoxAsync(scene) {
     BABYLON.Mesh.CreateBox("box1", 0.2, scene);
