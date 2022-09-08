@@ -15,6 +15,7 @@ set(DEPENDENCIES
 
 set(SCRIPTS
     "Scripts/experience.js"
+    "Scripts/playground_id_runner.js"
     "Scripts/playground_runner.js")
 
 if(APPLE)
