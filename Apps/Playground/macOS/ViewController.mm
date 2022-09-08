@@ -14,6 +14,7 @@
 #import <MetalKit/MetalKit.h>
 
 #import <math.h>
+#import <regex>
 
 std::unique_ptr<Babylon::Graphics::Device> device{};
 std::unique_ptr<Babylon::Graphics::DeviceUpdate> update{};
@@ -126,7 +127,20 @@ std::unique_ptr<Babylon::Polyfills::Canvas> nativeCanvas{};
     loader.LoadScript("app:///Scripts/babylonjs.materials.js");
     loader.LoadScript("app:///Scripts/babylon.gui.js");
 
-    if (scripts.empty())
+    // If scripts contains "--playgroundId", the next argument is the playground id.
+    std::string playgroundId;
+    auto it = std::find(scripts.begin(), scripts.end(), "--playgroundId");
+    if (it != scripts.end() && ++it != scripts.end())
+    {
+        playgroundId = *it;
+    }
+
+    if (std::regex_match(playgroundId, std::regex("^#[a-zA-Z0-9]+(#[a-zA-Z0-9]+)?$")))
+    {
+        loader.Eval(std::string("document.playgroundId = \"") + playgroundId + "\"", "");
+        loader.LoadScript("app:///Scripts/playground_id_runner.js");
+    }
+    else if (scripts.empty())
     {
         loader.LoadScript("app:///Scripts/experience.js");
     }
