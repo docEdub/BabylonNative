@@ -379,6 +379,10 @@ CreateBoxAsync(scene).then(function () {
         );
     }
 
+    setTimeout(() => {
+        engine._engine.dispose();
+    }, 1000)
+
 }, function (ex) {
     console.log(ex.message, ex.stack);
 });
