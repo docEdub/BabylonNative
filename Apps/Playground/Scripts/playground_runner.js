@@ -14,6 +14,9 @@ if (typeof createScene === "function") {
 
     setTimeout(() => {
         engine._engine.dispose()
-        engine._engine.letTextureLoadingProceed()
     }, 1000)
+
+    // setTimeout(() => {
+    //     engine._engine.letTextureLoadingProceed()
+    // }, 2000)
 }
