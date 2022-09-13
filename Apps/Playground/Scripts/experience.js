@@ -5,7 +5,7 @@
 
 var wireframe = false;
 var turntable = false;
-var logfps = true;
+var logfps = false;
 var ibl = false;
 var rtt = false;
 var vr = false;
@@ -15,7 +15,7 @@ var xrFeaturePoints = false;
 var meshDetection = false;
 var text = false;
 var hololens = false;
-var cameraTexture = false;
+var cameraTexture = true;
 var imageTracking = false;
 const readPixels = false;
 
@@ -77,25 +77,39 @@ CreateBoxAsync(scene).then(function () {
     if (cameraTexture) {
         scene.activeCamera.position.set(0, 1, -10);
         scene.activeCamera.setTarget(new BABYLON.Vector3(0, 1, 0));
-
         scene.meshes[0].setEnabled(false);
         var plane = BABYLON.MeshBuilder.CreatePlane("plane", {size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE});
         plane.rotation.y = Math.PI;
         plane.rotation.z = Math.PI;
-
         plane.position.y = 1;
-        
         var mat = new BABYLON.StandardMaterial("mat", scene);
         mat.diffuseColor = BABYLON.Color3.Black();
-
-        var tex = BABYLON.VideoTexture.CreateFromWebCam(scene, function(videoTexture) {
-            const videoSize = videoTexture.getSize();
-            mat.emissiveTexture = videoTexture;
-            plane.material = mat;
-            plane.scaling.x = 5;
-            plane.scaling.y = 5 * (videoSize.height / videoSize.width);
-            console.log("Video texture size: " + videoSize);
-        }, { maxWidth: 1280, maxHeight: 720, facingMode: 'environment'});
+        var count = 0;
+        var tex = undefined;
+        var createdTex = false;
+        scene.onBeforeRenderObservable.add(() => {
+            if (!createdTex) {
+                createdTex = true;
+                BABYLON.VideoTexture.CreateFromWebCam(scene, function(videoTexture) {
+                    videoTexture.video.removeAttribute = () => {
+                        // This is a temporary work-around because the VideoTexture dispose function
+                        // calls video.removeAttribute which isn't implemented by the BabylonNative polyfill.
+                        // See this GitHub issue: https://github.com/BabylonJS/BabylonNative/issues/1107
+                    };
+                    tex = videoTexture;
+                    const videoSize = videoTexture.getSize();
+                    mat.emissiveTexture = videoTexture;
+                    plane.material = mat;
+                    plane.scaling.x = 5;
+                    plane.scaling.y = 5 * (videoSize.height / videoSize.width);
+                    console.log("Video texture size: " + videoSize);
+                }, { maxWidth: 1280, maxHeight: 720, facingMode: 'environment'});
+            } else if (tex && ++count % 480 == 0) {
+                tex.dispose();
+                tex = undefined;
+                createdTex = false;
+            }
+        });
     }
 
     if (readPixels) {
