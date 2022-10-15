@@ -43,10 +43,12 @@ namespace Babylon::Polyfills::Internal
     TimeoutDispatcher::~TimeoutDispatcher()
     {
         {
-            std::unique_lock<std::mutex> lk{m_mutex};
+            std::unique_lock<std::mutex> mapsLock{m_mapsMutex};
             m_idMap.clear();
             m_timeMap.clear();
             m_shutdown = true;
+
+            std::unique_lock<std::mutex> condVariableLock{m_condVariableMutex};
             m_condVariable.notify_one();
         }
 
@@ -60,7 +62,7 @@ namespace Babylon::Polyfills::Internal
             delay = std::chrono::milliseconds{0};
         }
 
-        std::unique_lock<std::mutex> lk{m_mutex};
+        std::unique_lock<std::mutex> mapsLock{m_mapsMutex};
 
         const auto id = NextTimeoutId();
         const auto earliestTime = m_timeMap.empty() ? TimePoint::max()
@@ -68,21 +70,19 @@ namespace Babylon::Polyfills::Internal
         const auto time = Now() + delay;
         const auto result = m_idMap.insert({id, std::make_unique<Timeout>(id, std::move(function), time)});
         m_timeMap.insert({time, result.first->second.get()});
-    
-        m_runtime.Dispatch([this, time, earliestTime](Napi::Env) {
-            std::unique_lock<std::mutex> lk{m_mutex};
-            if (time <= earliestTime)
-            {
-                m_condVariable.notify_one();
-            }
-        });
+   
+        if (time <= earliestTime)
+        {
+            m_runtime.Dispatch([this, time, earliestTime](Napi::Env)
+                { m_condVariable.notify_one(); });
+        }
 
         return id;
     }
 
     void TimeoutDispatcher::Clear(TimeoutId id)
     {
-        std::unique_lock<std::mutex> lk{m_mutex};
+        std::unique_lock<std::mutex> mapsLock{m_mapsMutex};
         const auto itId = m_idMap.find(id);
         if (itId != m_idMap.end())
         {
@@ -126,7 +126,7 @@ namespace Babylon::Polyfills::Internal
     {
         while (!m_shutdown)
         {
-            std::unique_lock<std::mutex> lk{m_mutex};
+            std::unique_lock<std::mutex> mapsLock{m_mapsMutex};
             TimePoint nextTimePoint{};
 
             while (!m_timeMap.empty())
@@ -137,7 +137,8 @@ namespace Babylon::Polyfills::Internal
                     break;
                 }
 
-                m_condVariable.wait_until(lk, nextTimePoint);
+                std::unique_lock<std::mutex> condVariableLock{m_condVariableMutex};
+                m_condVariable.wait_until(condVariableLock, nextTimePoint);
             }
 
             while (!m_timeMap.empty() && m_timeMap.begin()->second->time == nextTimePoint)
@@ -150,7 +151,10 @@ namespace Babylon::Polyfills::Internal
 
             while (!m_shutdown && m_timeMap.empty())
             {
-                m_condVariable.wait(lk);
+                mapsLock.unlock();
+                std::unique_lock<std::mutex> condVariableLock{m_condVariableMutex};
+                m_condVariable.wait(condVariableLock);
+                mapsLock.lock();
             }
         }
     }
