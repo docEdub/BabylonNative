@@ -117,3 +117,34 @@ endif()
 if(BABYLON_NATIVE_INSTALL)
     include(Install/Install.cmake)
 endif()
+
+if((MSVC_VERSION GREATER_EQUAL 1928) AND (CMAKE_SIZEOF_VOID_P EQUAL 8))
+    function (_get_all_cmake_targets out_var current_dir)
+        get_property(targets DIRECTORY ${current_dir} PROPERTY BUILDSYSTEM_TARGETS)
+        get_property(subdirs DIRECTORY ${current_dir} PROPERTY SUBDIRECTORIES)
+
+        foreach(subdir ${subdirs})
+            _get_all_cmake_targets(subdir_targets ${subdir})
+            list(APPEND targets ${subdir_targets})
+        endforeach()
+
+        # Filter out interface targets.
+        foreach(target ${targets})
+            get_target_property(target_type ${target} TYPE)
+            if (NOT "${target_type}" STREQUAL "INTERFACE_LIBRARY" AND NOT "${target_type}" STREQUAL "UTILITY")
+                list(APPEND filtered_targets ${target})
+            endif()
+        endforeach()
+
+        set(${out_var} ${filtered_targets} PARENT_SCOPE)
+    endfunction()
+
+    _get_all_cmake_targets(targets ${CMAKE_CURRENT_LIST_DIR})
+
+    foreach(target ${targets})
+        get_target_property(target_type ${target} TYPE)
+        message("target = ${target}: ${target_type}")
+        target_compile_options(${target} PRIVATE "$<$<NOT:$<CONFIG:DEBUG>>:/guard:ehcont>")
+        target_link_options(${target} PRIVATE "$<$<NOT:$<CONFIG:DEBUG>>:/guard:ehcont>")
+    endforeach()
+endif()
