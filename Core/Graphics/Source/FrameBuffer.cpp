@@ -65,7 +65,7 @@ namespace Babylon::Graphics
         m_viewId = m_context.AcquireNewViewId(encoder);
         
         //Reset view state for next frame.
-        // m_viewPort = {0, 0, 1, 1};
+        m_viewPort = {0, 0, 1, 1};
         m_flags = BGFX_CLEAR_NONE;
         m_rgba = 0x000000ff;
         m_depth = 1.0f;
