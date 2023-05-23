@@ -8,65 +8,20 @@
 
 namespace Babylon
 {
-    struct NapiTask
+    void ScheduleTaskCallback(void *task_runner_data, void *task_data, v8_task_run_cb task_run_cb, v8_task_release_cb task_release_cb)
     {
-        NapiTask(
-            napi_env env,
-            napi_ext_task_callback taskCallback,
-            void* taskData,
-            napi_finalize finalizeCallback,
-            void* finalizeHint) noexcept
-            : m_env{env}
-            , m_taskCallback{taskCallback}
-            , m_taskData{taskData}
-            , m_finalizeCallback{finalizeCallback}
-            , m_finalizeHint{finalizeHint}
-        {
-        }
+        WorkQueue* worker = reinterpret_cast<WorkQueue*>(task_runner_data);
 
-        NapiTask(const NapiTask&) = delete;
-        NapiTask& operator=(const NapiTask&) = delete;
+        worker->Append([task = std::move(task_run_cb), task_data, task_release_cb](Napi::Env)
+        { 
+            task(task_data);
+            task_release_cb(task_data);
+        });
+    }
 
-        ~NapiTask()
-        {
-            if (m_finalizeCallback)
-            {
-                m_finalizeCallback(m_env, m_taskData, m_finalizeHint);
-            }
-        }
-
-        void operator()() noexcept
-        {
-            m_taskCallback(m_env, m_taskData);
-        }
-
-    private:
-        napi_env m_env;
-        napi_ext_task_callback m_taskCallback;
-        void* m_taskData;
-        napi_finalize m_finalizeCallback;
-        void* m_finalizeHint;
-    };
-
-    void __cdecl ScheduleTaskCallback(
-        napi_env env,
-        napi_ext_task_callback taskCallback,
-        void* taskData,
-        uint32_t /*delayInMsec*/,
-        napi_finalize finalizeCallback,
-        void* finalizeHint)
+    void __cdecl v8TaskRunnerReleaseCb(void *)
     {
-        WorkQueue* worker;
-        auto result = napi_get_instance_data(env, (void**)&worker);
 
-        if (result != napi_status::napi_ok)
-        {
-            std::terminate();
-        }
-
-        auto task = std::make_shared<NapiTask>(env, taskCallback, taskData, finalizeCallback, finalizeHint);
-        worker->Append([task = std::move(task)](Napi::Env)
-            { task->operator()(); });
     }
 
     void AppRuntime::RunEnvironmentTier(const char*)
@@ -74,14 +29,11 @@ namespace Babylon
         napi_env _env{};
         napi_ext_env_settings settings{};
         settings.this_size = sizeof(settings);
-        settings.inspector_port = 5643;
+        settings.flags.enable_inspector = true;
         settings.flags.wait_for_debugger = false;
-        settings.foreground_scheduler = &ScheduleTaskCallback;
+        settings.foreground_task_runner = v8_create_task_runner(this->m_workQueue.get(), &ScheduleTaskCallback, &v8TaskRunnerReleaseCb);
 
-        auto result = napi_ext_create_env(&settings, &_env);
-        assert(result == napi_status::napi_ok);
-
-        result = napi_set_instance_data(_env, this->m_workQueue.get(), nullptr /*finalize_cb*/, nullptr /*finalize_hint*/);
+        napi_status result = napi_ext_create_env(&settings, &_env);
         assert(result == napi_status::napi_ok);
 
         Napi::Env env = Napi::Env(_env);
