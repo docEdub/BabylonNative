@@ -2,6 +2,15 @@
 cmake_minimum_required(VERSION 3.18)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# CMakeExtensions
+include(FetchContent)
+FetchContent_Declare(cmake-extensions
+    GIT_REPOSITORY https://github.com/BabylonJS/CMakeExtensions.git
+    GIT_TAG 366dc4a84fb20f4060d97e89948c343e74c51fc3)
+message(STATUS "Fetching cmake-extensions")
+FetchContent_MakeAvailable(cmake-extensions)
+message(STATUS "Fetching cmake-extensions - done")
+
 project(BabylonNative)
 
 # --------------------------------------------------

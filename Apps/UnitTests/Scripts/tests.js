@@ -1,21 +1,4 @@
-﻿// TODO: use premade reporter (once Console Polyfill is fixed)
-function BabylonReporter(runner) {
-    const stats = runner.stats;
-
-    runner.on("pass", test => {
-        console.log(`Passed: ${test.fullTitle()}`);
-    });
-
-    runner.on("fail", (test, err) => {
-        console.log(`Failed: ${test.fullTitle()} with error: ${err.message}`);
-    });
-
-    runner.on("end", () => {
-        console.log(`Tests passed: ${stats.passes}/${stats.tests}`);
-    });
-}
-
-mocha.setup({ ui: "bdd", reporter: BabylonReporter });
+﻿mocha.setup({ ui: "bdd", reporter: "tap", retries: 5 });
 
 function createRequest(method, url) {
     return new Promise((resolve, reject) => {
@@ -31,11 +14,11 @@ const expect = chai.expect;
 describe("XMLHTTPRequest", function () {
     this.timeout(0);
     it("should have readyState=4 when load ends", async function () {
-        const xhr = await createRequest("GET", "https://httpstat.us/");
+        const xhr = await createRequest("GET", "https://github.com/");
         expect(xhr.readyState).to.equal(4);
     });
     it("should have status=200 for a file that exists", async function () {
-        const xhr = await createRequest("GET", "https://httpstat.us/200");
+        const xhr = await createRequest("GET", "https://github.com/");
         expect(xhr.status).to.equal(200);
     });
     it("should load URLs with escaped unicode characters", async function () {
@@ -51,7 +34,7 @@ describe("XMLHTTPRequest", function () {
         expect(xhr.status).to.equal(200);
     });
     it("should have status=404 for a file that does not exist", async function () {
-        const xhr = await createRequest("GET", "https://httpstat.us/404");
+        const xhr = await createRequest("GET", "https://github.com/babylonJS/BabylonNative404");
         expect(xhr.status).to.equal(404);
     });
     it("should throw something when opening //", async function () {
