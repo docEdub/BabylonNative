@@ -9,6 +9,8 @@
 #include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.Foundation.Collections.h>
 
+#include <filesystem>
+
 namespace UrlLib
 {
     using namespace winrt::Windows;
@@ -60,19 +62,20 @@ namespace UrlLib
         {
             try
             {
-                if (m_uri.SchemeName() == L"app")
+                if (m_uri.SchemeName() == L"app" || m_uri.SchemeName() == L"file")
                 {
-                    return arcana::create_task<std::exception_ptr>(Storage::StorageFolder::GetFolderFromPathAsync(GetInstalledLocation()))
-                        .then(arcana::inline_scheduler, m_cancellationSource, [this, m_uri{m_uri}](Storage::StorageFolder folder) {
-                            return arcana::create_task<std::exception_ptr>(folder.GetFileAsync(GetLocalPath(m_uri)));
-                        })
-                        .then(arcana::inline_scheduler, m_cancellationSource, [this](Storage::StorageFile file) {
-                            return LoadFileAsync(file);
-                        });
-                }
-                else if (m_uri.SchemeName() == L"file")
-                {
-                    return arcana::create_task<std::exception_ptr>(Storage::StorageFile::GetFileFromPathAsync(GetLocalPath(m_uri)))
+                    auto path = GetLocalPath(m_uri);
+                    if (m_uri.SchemeName() == L"app")
+                    {
+                        path = std::wstring(GetInstalledLocation()) + L"\\" + path;
+                    }
+
+                    while (std::filesystem::is_symlink(path))
+                    {
+                        path = std::filesystem::read_symlink(path);
+                    }
+
+                    return arcana::create_task<std::exception_ptr>(Storage::StorageFile::GetFileFromPathAsync(path))
                         .then(arcana::inline_scheduler, m_cancellationSource, [this](Storage::StorageFile file) {
                             return LoadFileAsync(file);
                         });
