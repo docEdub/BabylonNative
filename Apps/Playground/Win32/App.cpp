@@ -20,6 +20,7 @@
 #include <Babylon/Plugins/NativeXr.h>
 #include <Babylon/Plugins/NativeCamera.h>
 #include <Babylon/Plugins/NativeInput.h>
+#include <Babylon/Plugins/TestUtils.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
@@ -125,11 +126,14 @@ namespace
 
         runtime.emplace();
 
-        runtime->Dispatch([](Napi::Env env) {
+        runtime->Dispatch([hWnd](Napi::Env env) {
             device->AddToJavaScript(env);
 
             Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto) {
                 OutputDebugStringA(message);
+
+                printf("%s", message);
+                fflush(stdout);
             });
 
             Babylon::Polyfills::Window::Initialize(env);
@@ -155,6 +159,7 @@ namespace
             {
                 chromeDevTools->StartInspector(5643, "BabylonNative Playground");
             }
+            Babylon::Plugins::TestUtils::Initialize(env, hWnd);
         });
 
         Babylon::ScriptLoader loader{*runtime};
@@ -405,7 +410,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_DESTROY:
         {
             Uninitialize();
-            PostQuitMessage(0);
+            PostQuitMessage(Babylon::Plugins::TestUtils::errorCode);
             break;
         }
         case WM_KEYDOWN:
