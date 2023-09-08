@@ -1,6 +1,5 @@
 set(SOURCES
     "Include/Babylon/Polyfills/AudioContext.h"
-    "Source/AudioContext.h"
     "Source/AudioContext.cpp")
 
 add_library(AudioContext ${SOURCES})
