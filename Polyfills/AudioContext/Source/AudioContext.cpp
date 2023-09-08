@@ -11,12 +11,12 @@ namespace Babylon::Polyfills::Internal
     {
         Napi::HandleScope scope{env};
 
-        Napi::Function constructor = DefineClass(
+        Napi::Function func = DefineClass(
             env,
             JS_CONSTRUCTOR_NAME,
             {});
 
-        JsRuntime::NativeObject::GetFromJavaScript(env).Set(JS_CONSTRUCTOR_NAME, constructor);
+        env.Global().Set(JS_CONSTRUCTOR_NAME, func);
     }
 
     AudioContext::AudioContext(const Napi::CallbackInfo& info)

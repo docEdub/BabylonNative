@@ -5,7 +5,7 @@
 
 var wireframe = false;
 var turntable = false;
-var logfps = true;
+var logfps = false;
 var ibl = false;
 var rtt = false;
 var vr = false;
@@ -17,6 +17,7 @@ var text = false;
 var hololens = false;
 var cameraTexture = false;
 var imageTracking = false;
+var sound = true;
 const readPixels = false;
 
 function CreateBoxAsync(scene) {
@@ -84,7 +85,7 @@ CreateBoxAsync(scene).then(function () {
         plane.rotation.z = Math.PI;
 
         plane.position.y = 1;
-        
+
         var mat = new BABYLON.StandardMaterial("mat", scene);
         mat.diffuseColor = BABYLON.Color3.Black();
 
@@ -340,7 +341,7 @@ CreateBoxAsync(scene).then(function () {
                         {
                             images: [
                                 { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescentDishWithOlives/screenshot/screenshot_Large.jpg", estimatedRealWorldWidth: .2 },
-                                { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DragonAttenuation/screenshot/screenshot_large.png", estimatedRealWorldWidth: .2 },   
+                                { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DragonAttenuation/screenshot/screenshot_large.png", estimatedRealWorldWidth: .2 },
                         ]});
 
                     webXRImageTrackingModule.onTrackedImageUpdatedObservable.add((imageObject) => {
@@ -376,6 +377,10 @@ CreateBoxAsync(scene).then(function () {
                 "color": "#FF0000"
             }
         );
+    }
+
+    if (sound) {
+        const audioContext = new AudioContext();
     }
 
 }, function (ex) {
