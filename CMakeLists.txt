@@ -17,9 +17,12 @@ FetchContent_Declare(JsRuntimeHost
 FetchContent_Declare(AndroidExtensions
     GIT_REPOSITORY https://github.com/BabylonJS/AndroidExtensions.git
     GIT_TAG 883c4a286116e51ee989e39ee8e216d632997329)
+FetchContent_Declare(LabSound
+    GIT_REPOSITORY https://github.com/LabSound/LabSound.git
+    GIT_TAG a494aad10c9a88fff27a74b04ccb12ea0d2c6cf4)
 set(JSRUNTIMEHOST_TESTS OFF)
 
-set(CONTENT_TO_FETCH cmake-extensions JsRuntimeHost)
+set(CONTENT_TO_FETCH cmake-extensions JsRuntimeHost LabSound)
 
 if(IOS)
     FetchContent_MakeAvailable(ios-cmake)
@@ -54,6 +57,7 @@ option(BABYLON_NATIVE_PLUGIN_NATIVEXR "Include Babylon Native Plugin XR." ON)
 ## Polyfills
 option(BABYLON_NATIVE_POLYFILL_WINDOW "Include Babylon Native Polyfill Window." ON)
 option(BABYLON_NATIVE_POLYFILL_CANVAS "Include Babylon Native Polyfill Canvas." ON)
+option(BABYLON_NATIVE_POLYFILL_AUDIOCONTEXT "Include Babylon Native Polyfill AudioContext." ON)
 # --------------------------------------------------
 
 if(APPLE)

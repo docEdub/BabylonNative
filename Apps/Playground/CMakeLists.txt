@@ -114,6 +114,7 @@ target_include_directories(Playground PRIVATE "Source" ".")
 
 target_link_libraries(Playground
     PRIVATE AppRuntime
+    PRIVATE AudioContext
     PRIVATE Canvas
     PRIVATE Console
     PRIVATE ExternalTexture
@@ -138,7 +139,7 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
     # Ubuntu mixes old experimental header and new runtime libraries
     # Resulting in crash at runtime for std::filesystem
     # https://stackoverflow.com/questions/56738708/c-stdbad-alloc-on-stdfilesystempath-append
-    target_link_libraries(Playground 
+    target_link_libraries(Playground
         PRIVATE stdc++fs)
 endif()
 
