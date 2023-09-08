@@ -4,6 +4,7 @@ if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS) OR (UNIX AND NOT AND
 endif()
 
 set(LOCAL_SCRIPTS
+    "Scripts/audio-tests.js"
     "Scripts/tests.js")
 
 set(NPM_SCRIPTS
@@ -32,6 +33,7 @@ set_property(TARGET UnitTests PROPERTY UNITY_BUILD false)
 
 target_link_libraries(UnitTests
     PRIVATE AppRuntime
+    PRIVATE AudioContext
     PRIVATE Canvas
     PRIVATE Console
     PRIVATE GraphicsDevice

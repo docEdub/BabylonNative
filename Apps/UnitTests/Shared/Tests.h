@@ -2,6 +2,7 @@
 #include <future>
 #include <Babylon/AppRuntime.h>
 #include <Babylon/Graphics/Device.h>
+#include <Babylon/Polyfills/AudioContext.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
@@ -42,8 +43,9 @@ int Run(Babylon::Graphics::Device device)
         });
         Babylon::Polyfills::Window::Initialize(env);
         nativeCanvas.emplace(Babylon::Polyfills::Canvas::Initialize(env));
+        Babylon::Polyfills::AudioContext::Initialize(env);
         Babylon::Plugins::NativeEngine::Initialize(env);
-        
+
         env.Global().Set(JS_FUNCTION_NAME, Napi::Function::New(env, SetExitCode, JS_FUNCTION_NAME));
     });
 
@@ -54,7 +56,7 @@ int Run(Babylon::Graphics::Device device)
     loader.LoadScript("app:///Scripts/babylonjs.materials.js");
     loader.LoadScript("app:///Scripts/chai.js");
     loader.LoadScript("app:///Scripts/mocha.js");
-    loader.LoadScript("app:///Scripts/tests.js");
+    loader.LoadScript("app:///Scripts/audio-tests.js");
 
     device.StartRenderingCurrentFrame();
     device.FinishRenderingCurrentFrame();
