@@ -382,6 +382,7 @@ CreateBoxAsync(scene).then(function () {
     if (sound) {
         const audioContext = new AudioContext();
         const masterGain = audioContext.createGain();
+        const gain = new GainNode(audioContext);
     }
 
 }, function (ex) {
