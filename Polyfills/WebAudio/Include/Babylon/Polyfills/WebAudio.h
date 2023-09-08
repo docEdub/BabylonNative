@@ -2,7 +2,7 @@
 
 #include <napi/env.h>
 
-namespace Babylon::Polyfills::AudioContext
+namespace Babylon::Polyfills::WebAudio
 {
     void Initialize(Napi::Env env);
 }

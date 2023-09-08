@@ -114,7 +114,6 @@ target_include_directories(Playground PRIVATE "Source" ".")
 
 target_link_libraries(Playground
     PRIVATE AppRuntime
-    PRIVATE AudioContext
     PRIVATE Canvas
     PRIVATE Console
     PRIVATE ExternalTexture
@@ -124,6 +123,7 @@ target_link_libraries(Playground
     PRIVATE NativeInput
     PRIVATE NativeOptimizations
     PRIVATE ScriptLoader
+    PRIVATE WebAudio
     PRIVATE Window
     PRIVATE XMLHttpRequest
     PRIVATE TestUtils

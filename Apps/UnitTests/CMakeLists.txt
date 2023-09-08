@@ -33,13 +33,13 @@ set_property(TARGET UnitTests PROPERTY UNITY_BUILD false)
 
 target_link_libraries(UnitTests
     PRIVATE AppRuntime
-    PRIVATE AudioContext
     PRIVATE Canvas
     PRIVATE Console
     PRIVATE GraphicsDevice
     PRIVATE NativeEngine
     PRIVATE ScriptLoader
     PRIVATE UrlLib
+    PRIVATE WebAudio
     PRIVATE Window
     PRIVATE XMLHttpRequest
     ${ADDITIONAL_LIBRARIES})

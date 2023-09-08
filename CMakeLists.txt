@@ -57,7 +57,7 @@ option(BABYLON_NATIVE_PLUGIN_NATIVEXR "Include Babylon Native Plugin XR." ON)
 ## Polyfills
 option(BABYLON_NATIVE_POLYFILL_WINDOW "Include Babylon Native Polyfill Window." ON)
 option(BABYLON_NATIVE_POLYFILL_CANVAS "Include Babylon Native Polyfill Canvas." ON)
-option(BABYLON_NATIVE_POLYFILL_AUDIOCONTEXT "Include Babylon Native Polyfill AudioContext." ON)
+option(BABYLON_NATIVE_POLYFILL_WEBAUDIO "Include Babylon Native Polyfill WebAudio." ON)
 # --------------------------------------------------
 
 if(APPLE)

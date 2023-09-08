@@ -4,7 +4,7 @@
 #import <Babylon/Graphics/Device.h>
 #import <Babylon/Plugins/NativeEngine.h>
 #import <Babylon/Plugins/NativeInput.h>
-#import <Babylon/Polyfills/AudioContext.h>
+#import <Babylon/Polyfills/WebAudio.h>
 #import <Babylon/Polyfills/Window.h>
 #import <Babylon/Polyfills/XMLHttpRequest.h>
 #import <Babylon/Polyfills/Canvas.h>
@@ -121,7 +121,7 @@ Babylon::Plugins::NativeInput* nativeInput{};
 
         Babylon::Polyfills::XMLHttpRequest::Initialize(env);
 
-        Babylon::Polyfills::AudioContext::Initialize(env);
+        Babylon::Polyfills::WebAudio::Initialize(env);
 
         nativeCanvas.emplace(Babylon::Polyfills::Canvas::Initialize(env));
 
