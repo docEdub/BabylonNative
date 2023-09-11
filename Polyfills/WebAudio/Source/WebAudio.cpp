@@ -231,10 +231,13 @@ namespace Babylon::Polyfills::WebAudio
         auto audioNodeClassPrototype = audioNodeClass.Get("prototype");
         auto gainNodeClassPrototype = gainNodeClass.Get("prototype");
 
+        // Works on Win32 x64 Chakra.
+        // Works on macOS JavaScriptCore.
+        // Fails on Win32 x64 V8 -> Uncaught Error: Cyclic __proto__ value.
         setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
 
-        // This doesn't work on macOS JavaScriptCore.
-        // Uncaught Error: Cannot set prototype of immutable prototype object.
+        // Works on Win32 x64 Chakra.
+        // Fails on macOS JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
         setPrototypeOf.Call({ gainNodeClassPrototype, audioNodeClassPrototype });
     }
 }
