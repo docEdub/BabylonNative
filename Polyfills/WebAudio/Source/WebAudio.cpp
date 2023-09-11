@@ -222,6 +222,7 @@ namespace Babylon::Polyfills::WebAudio
 
         Internal::AudioContext::Initialize(env);
 
+        Napi::Function getPrototypeOf = env.Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
         Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
 
 
@@ -258,11 +259,14 @@ namespace Babylon::Polyfills::WebAudio
         auto gainNodeClass = Internal::GainNode::Initialize(env);
         //Internal::AudioNode::Initialize(env);
         //Internal::GainNode::Initialize(env);
-        //auto audioNodeClass = env.Global().Get("AudioNode").ToObject();
-        //auto gainNodeClass = env.Global().Get("GainNode").ToObject();
-        auto objectClassPrototype = objectClass.Get("prototype").ToObject();
-        auto audioNodeClassPrototype = audioNodeClass.Get("prototype").ToObject();
-        auto gainNodeClassPrototype = gainNodeClass.Get("prototype").ToObject();
+        auto audioNodeClass2 = env.Global().Get("AudioNode").ToObject();
+        auto gainNodeClass2 = env.Global().Get("GainNode").ToObject();
+        //auto objectClassPrototype = objectClass.Get("prototype").ToObject();
+        //auto audioNodeClassPrototype = audioNodeClass.Get("prototype");//.ToObject();
+        //auto gainNodeClassPrototype = gainNodeClass.Get("prototype");//.ToObject();
+        auto objectClassPrototype = getPrototypeOf.Call({objectClass}).ToObject();
+        auto audioNodeClassPrototype = getPrototypeOf.Call({audioNodeClass2}).ToObject();
+        auto gainNodeClassPrototype = getPrototypeOf.Call({gainNodeClass2}).ToObject();
 
         //setPrototypeOf.Call({audioNodeClassPrototype, objectClassPrototype});
         //setPrototypeOf.Call({audioNodeClass, objectClass});
@@ -273,13 +277,19 @@ namespace Babylon::Polyfills::WebAudio
         gainNodeClassPrototype.Set("_af_proto_", "gainNodeClassPrototype");
         auto gainProtoId = gainNodeClassPrototype.Get("_af_proto_").ToString().Utf8Value();
         auto audioNodeProtoId = audioNodeClassPrototype.Get("_af_proto_").ToString().Utf8Value();
+
         auto objectProtoId = objectClassPrototype.Get("_af_proto_").ToString().Utf8Value();
 
-        gainNodeClass.Set("_af_class_", "gainNodeClass");
-        auto gainId = gainNodeClass.Get("_af_class_").ToString().Utf8Value();
-        auto audioNodeId = audioNodeClass.Get("_af_class_").ToString().Utf8Value();
+        gainNodeClass2.Set("_af_class_", "gainNodeClass");
+        auto gainId = gainNodeClass2.Get("_af_class_").ToString().Utf8Value();
+        auto audioNodeId = audioNodeClass2.Get("_af_class_").ToString().Utf8Value();
 
-        setPrototypeOf.Call({gainNodeClass, audioNodeClass});
+        auto isAudioClassUndefined = audioNodeClass.IsUndefined();
+        auto isGainNodeClassUndefined = gainNodeClass.IsUndefined();
+        auto isAudioNodeProtoUndefined = audioNodeClassPrototype.IsUndefined();
+        auto isGainNodeProtoUndefined = gainNodeClassPrototype.IsUndefined();
+
         setPrototypeOf.Call({gainNodeClassPrototype, audioNodeClassPrototype});
+        setPrototypeOf.Call({gainNodeClass, audioNodeClass});
     }
 }

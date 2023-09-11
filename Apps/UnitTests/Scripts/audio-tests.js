@@ -27,6 +27,11 @@ describe("GainNode", function () {
     // });
 
     it("connects to audio context destination", function () {
+        //Object.setPrototypeOf(GainNode.prototype, AudioNode.prototype);
+        //Object.setPrototypeOf(GainNode, AudioNode);
+        //Object.defineProperty(GainNode.prototype, "prototype", AudioNode.prototype);
+        //Object.defineProperty(GainNode, "prototype", AudioNode);
+
         const audioContext = new AudioContext();
         const gainNode = new GainNode(audioContext);
         const connectedNode = gainNode.connect(audioContext.destination);
