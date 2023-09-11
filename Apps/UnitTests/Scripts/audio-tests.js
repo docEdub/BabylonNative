@@ -27,7 +27,9 @@ describe("GainNode", function () {
      it("is constructable", function () {
          const audioContext = new AudioContext();
          const gainNode = new GainNode(audioContext);
+         expect(gainNode).to.not.be.null;
          expect(gainNode).to.not.be.undefined;
+         expect(gainNode instanceof GainNode).to.be.true;
      });
 
     it("is instanceof AudioNode", function () {
