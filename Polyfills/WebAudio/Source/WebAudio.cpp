@@ -67,30 +67,32 @@ namespace Babylon::Polyfills::Internal
         Napi::Object m_jsDestinationNode;
     };
 
-    template<class T> class AudioNodeWrap : public Napi::ObjectWrap<T>
+    class AudioNode : public Napi::ObjectWrap<AudioNode>
     {
-        static constexpr auto JS_CLASS_NAME = "AudioNode";
-
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
             Napi::HandleScope scope{env};
 
-            Napi::Function func = Napi::ObjectWrap<T>::DefineClass(
+            Napi::Function func = DefineClass(
                 env,
-                JS_CLASS_NAME,
+                "AudioNode",
                 {
-                    // Napi::ObjectWrap<T>::StaticAccessor("prototype", &AudioNodeWrap::GetPrototype, &AudioNodeWrap::SetPrototype),
-                    Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeWrap::Connect)
+                    InstanceMethod("connect", &AudioNode::Connect)
                 });
 
-            env.Global().Set(JS_CLASS_NAME, func);
+            env.Global().Set("AudioNode", func);
 
             return func;
         }
 
-        AudioNodeWrap(const Napi::CallbackInfo& info)
-            : Napi::ObjectWrap<T>(info)
+        static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
+        {
+            return info.Env().Global().Get("AudioNode").As<Napi::Function>().New({audioContext});
+        }
+
+        AudioNode(const Napi::CallbackInfo& info)
+            : Napi::ObjectWrap<AudioNode>(info)
             , m_audioContextImpl{AudioContext::Unwrap(info[0].As<Napi::Object>())->impl()}
         {
         }
@@ -123,60 +125,56 @@ namespace Babylon::Polyfills::Internal
         Napi::Value Connect(const Napi::CallbackInfo& info)
         {
             auto jsDestinationNode = info[0].ToObject();
-            auto destinationNode = T::Unwrap(jsDestinationNode);
-            m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
+            auto destinationNode = AudioNode::Unwrap(jsDestinationNode);
+            //m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
             return jsDestinationNode;
         }
 
         // static Napi::Value m_jsPrototype;
     };
 
-    class AudioNode : public AudioNodeWrap<AudioNode>
+    //class AudioNode : public AudioNodeWrap<AudioNode>
+    //{
+    //public:
+    //    static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
+    //    {
+    //        return info.Env().Global().Get("AudioNode").As<Napi::Function>().New({audioContext});
+    //    }
+
+    //    AudioNode(const Napi::CallbackInfo& info)
+    //        : AudioNodeWrap<AudioNode>(info)
+    //    {
+    //    }
+    //};
+
+    class GainNode : public Napi::ObjectWrap<GainNode>
     {
-        static constexpr auto JS_CLASS_NAME = "AudioNode";
-
-    public:
-        static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
-        {
-            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({ audioContext });
-        }
-
-        AudioNode(const Napi::CallbackInfo& info)
-            : AudioNodeWrap<AudioNode>(info)
-        {
-        }
-    };
-
-    class GainNode : public AudioNodeWrap<GainNode>
-    {
-        static constexpr auto JS_CLASS_NAME = "GainNode";
-
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
             Napi::HandleScope scope{env};
 
-            Napi::Function func = ObjectWrap<GainNode>::DefineClass(
+            Napi::Function func = DefineClass(
                 env,
-                JS_CLASS_NAME,
+                "GainNode",
                 {
                     // Napi::ObjectWrap<GainNode>::StaticAccessor("prototype", &GainNode::GetPrototype, &GainNode::SetPrototype)
                 });
 
-            env.Global().Set(JS_CLASS_NAME, func);
+            env.Global().Set("GainNode", func);
 
             return func;
         }
 
         static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
         {
-            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({ audioContext });
+            return info.Env().Global().Get("GainNode").As<Napi::Function>().New({audioContext});
         }
 
         GainNode(const Napi::CallbackInfo& info)
-            : AudioNodeWrap<GainNode>{info}
+            : Napi::ObjectWrap<GainNode>{info}
         {
-            setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
+            //setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
         }
 
     private:
@@ -224,20 +222,64 @@ namespace Babylon::Polyfills::WebAudio
 
         Internal::AudioContext::Initialize(env);
 
+        Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
+
+
+        /* 1
         auto audioNodeClass = Internal::AudioNode::Initialize(env);
         auto gainNodeClass = Internal::GainNode::Initialize(env);
-
-        Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
         auto audioNodeClassPrototype = audioNodeClass.Get("prototype");
         auto gainNodeClassPrototype = gainNodeClass.Get("prototype");
 
         // Works on Win32 x64 Chakra.
-        // Works on macOS JavaScriptCore.
-        // Fails on Win32 x64 V8 -> Uncaught Error: Cyclic __proto__ value.
-        setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
-
-        // Works on Win32 x64 Chakra.
+        // Fails on Win32 x64 V8 -> Uncaught Error: Object.setPrototypeOf called on null or undefined.
         // Fails on macOS JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
         setPrototypeOf.Call({ gainNodeClassPrototype, audioNodeClassPrototype });
+
+        // Works on Win32 x64 Chakra.
+        setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
+        */
+
+        /* 2
+        auto audioNodeClass = Internal::AudioNode::Initialize(env).ToObject().Get("constructor").ToObject();
+        auto gainNodeClass = Internal::GainNode::Initialize(env).ToObject().Get("constructor").ToObject();
+        auto audioNodeClassPrototype = audioNodeClass.Get("prototype");
+        auto gainNodeClassPrototype = gainNodeClass.Get("prototype");
+
+        // Fails on Win32 x64 V8 -> Uncaught Error: Cyclic __proto__ value.
+        setPrototypeOf.Call({gainNodeClassPrototype, audioNodeClassPrototype});
+
+        setPrototypeOf.Call({gainNodeClass, audioNodeClass});
+        */
+
+        /* 3 */
+        auto objectClass = env.Global().Get("Object").ToObject().Get("constructor").ToObject();
+        auto audioNodeClass = Internal::AudioNode::Initialize(env);
+        auto gainNodeClass = Internal::GainNode::Initialize(env);
+        //Internal::AudioNode::Initialize(env);
+        //Internal::GainNode::Initialize(env);
+        //auto audioNodeClass = env.Global().Get("AudioNode").ToObject();
+        //auto gainNodeClass = env.Global().Get("GainNode").ToObject();
+        auto objectClassPrototype = objectClass.Get("prototype").ToObject();
+        auto audioNodeClassPrototype = audioNodeClass.Get("prototype").ToObject();
+        auto gainNodeClassPrototype = gainNodeClass.Get("prototype").ToObject();
+
+        //setPrototypeOf.Call({audioNodeClassPrototype, objectClassPrototype});
+        //setPrototypeOf.Call({audioNodeClass, objectClass});
+
+        //setPrototypeOf.Call({gainNodeClassPrototype, objectClassPrototype});
+        //setPrototypeOf.Call({gainNodeClass, objectClass});
+
+        gainNodeClassPrototype.Set("_af_proto_", "gainNodeClassPrototype");
+        auto gainProtoId = gainNodeClassPrototype.Get("_af_proto_").ToString().Utf8Value();
+        auto audioNodeProtoId = audioNodeClassPrototype.Get("_af_proto_").ToString().Utf8Value();
+        auto objectProtoId = objectClassPrototype.Get("_af_proto_").ToString().Utf8Value();
+
+        gainNodeClass.Set("_af_class_", "gainNodeClass");
+        auto gainId = gainNodeClass.Get("_af_class_").ToString().Utf8Value();
+        auto audioNodeId = audioNodeClass.Get("_af_class_").ToString().Utf8Value();
+
+        setPrototypeOf.Call({gainNodeClass, audioNodeClass});
+        setPrototypeOf.Call({gainNodeClassPrototype, audioNodeClassPrototype});
     }
 }
