@@ -14,13 +14,17 @@ namespace Babylon::Polyfills::Internal
         const std::vector<lab::AudioDeviceInfo> audioDevices = lab::AudioDevice_RtAudio::MakeAudioDeviceList();
 
         lab::AudioDeviceInfo defaultOutputInfo;
-        for (auto& info : audioDevices) {
+        for (auto& info : audioDevices)
+        {
             if (info.is_default_output)
+            {
                 defaultOutputInfo = info;
+            }
         }
 
         lab::AudioStreamConfig outputConfig;
-        if (defaultOutputInfo.index != -1) {
+        if (defaultOutputInfo.index != -1)
+        {
             outputConfig.device_index = defaultOutputInfo.index;
             outputConfig.desired_channels = std::min(uint32_t(2), defaultOutputInfo.num_output_channels);
             outputConfig.desired_samplerate = defaultOutputInfo.nominal_samplerate;
