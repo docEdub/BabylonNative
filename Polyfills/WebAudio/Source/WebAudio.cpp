@@ -7,6 +7,8 @@
 
 namespace Babylon::Polyfills::Internal
 {
+    Napi::Value AudioNodeClass;
+
     lab::AudioStreamConfig GetDefaultAudioDeviceConfiguration()
     {
         const std::vector<lab::AudioDeviceInfo> audioDevices = lab::AudioDevice_RtAudio::MakeAudioDeviceList();
@@ -34,8 +36,6 @@ namespace Babylon::Polyfills::Internal
     public:
         static void Initialize(Napi::Env env)
         {
-            Napi::HandleScope scope{env};
-
             Napi::Function func = DefineClass(
                 env,
                 JS_CLASS_NAME,
@@ -54,6 +54,7 @@ namespace Babylon::Polyfills::Internal
     private:
         Napi::Value GetDestination(const Napi::CallbackInfo& info)
         {
+            assert(m_jsDestinationNode.IsObject());
             return m_jsDestinationNode;
         }
 
@@ -74,8 +75,6 @@ namespace Babylon::Polyfills::Internal
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::HandleScope scope{env};
-
             Napi::Function func = Napi::ObjectWrap<T>::DefineClass(
                 env,
                 JS_CLASS_NAME,
@@ -101,7 +100,16 @@ namespace Babylon::Polyfills::Internal
         }
 
     protected:
-        template<class ImplT> std::shared_ptr<ImplT> impl() const
+        Napi::Value Connect(const Napi::CallbackInfo& info)
+        {
+            auto jsDestinationNode = info[0].ToObject();
+            auto destinationNode = T::Unwrap(jsDestinationNode);
+            m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
+            return jsDestinationNode;
+        }
+
+        template<class ImplT>
+        std::shared_ptr<ImplT> impl() const
         {
             return std::reinterpret_pointer_cast<ImplT>(m_impl);
         }
@@ -119,14 +127,6 @@ namespace Babylon::Polyfills::Internal
         // {
         //     m_jsPrototype = value;
         // }
-
-        Napi::Value Connect(const Napi::CallbackInfo& info)
-        {
-            auto jsDestinationNode = info[0].ToObject();
-            auto destinationNode = T::Unwrap(jsDestinationNode);
-            m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
-            return jsDestinationNode;
-        }
 
         // static Napi::Value m_jsPrototype;
     };
@@ -154,13 +154,12 @@ namespace Babylon::Polyfills::Internal
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::HandleScope scope{env};
-
             Napi::Function func = ObjectWrap<GainNode>::DefineClass(
                 env,
                 JS_CLASS_NAME,
                 {
                     // Napi::ObjectWrap<GainNode>::StaticAccessor("prototype", &GainNode::GetPrototype, &GainNode::SetPrototype)
+                    Napi::ObjectWrap<GainNode>::InstanceMethod("connect", &AudioNodeWrap::Connect)
                 });
 
             env.Global().Set(JS_CLASS_NAME, func);
@@ -175,11 +174,27 @@ namespace Babylon::Polyfills::Internal
 
         GainNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<GainNode>{info}
+            , m_jsAudioNode{AudioNode::New(info, info[0])}
         {
             setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
+            return;
+
+            Napi::Function setPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
+            Napi::Function getPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
+
+            //auto audioNodeClass = info.Env().Global().Get("AudioNode");
+            auto audioNodeClass = m_jsAudioNode;
+            auto audioNodeClassProto = getPrototypeOf.Call({audioNodeClass});
+
+            auto gainNodeClassProto = getPrototypeOf.Call({info.This()});
+
+            setPrototypeOf.Call({gainNodeClassProto, audioNodeClassProto});
+            setPrototypeOf.Call({info.This(), m_jsAudioNode});
         }
 
     private:
+        Napi::Object m_jsAudioNode;
+
         // static Napi::Value GetPrototype(const Napi::CallbackInfo& info)
         // {
         //     return m_jsPrototype;
@@ -190,7 +205,7 @@ namespace Babylon::Polyfills::Internal
         //     m_jsPrototype = value;
         // }
 
-        static Napi::Value m_jsPrototype;
+        //static Napi::Value m_jsPrototype;
     };
 
     // Napi::Value GainNode::m_jsPrototype;
@@ -232,12 +247,12 @@ namespace Babylon::Polyfills::WebAudio
         auto gainNodeClassPrototype = gainNodeClass.Get("prototype");
 
         // Works on Win32 x64 Chakra.
+        // Fails on macOS JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
+        setPrototypeOf.Call({gainNodeClassPrototype, audioNodeClassPrototype});
+
+        // Works on Win32 x64 Chakra.
         // Works on macOS JavaScriptCore.
         // Fails on Win32 x64 V8 -> Uncaught Error: Cyclic __proto__ value.
         setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
-
-        // Works on Win32 x64 Chakra.
-        // Fails on macOS JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
-        setPrototypeOf.Call({ gainNodeClassPrototype, audioNodeClassPrototype });
     }
 }
