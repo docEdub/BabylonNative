@@ -3,6 +3,7 @@ set(SOURCES
     "Source/WebAudio.cpp")
 
 add_library(WebAudio ${SOURCES})
+# TODO: Cleanup LabSound warnings and re-enable warnings as errors.
 # warnings_as_errors(WebAudio)
 
 target_include_directories(WebAudio

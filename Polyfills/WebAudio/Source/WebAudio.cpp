@@ -79,7 +79,6 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
-                    // Napi::ObjectWrap<T>::StaticAccessor("prototype", &AudioNodeWrap::GetPrototype, &AudioNodeWrap::SetPrototype),
                     Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeWrap::Connect)
                 });
 
@@ -116,19 +115,6 @@ namespace Babylon::Polyfills::Internal
 
         lab::AudioContext& m_audioContextImpl;
         std::shared_ptr<lab::AudioNode> m_impl;
-
-    private:
-        // static Napi::Value GetPrototype(const Napi::CallbackInfo& info)
-        // {
-        //     return m_jsPrototype;
-        // }
-
-        // static void SetPrototype(const Napi::CallbackInfo& info, const Napi::Value& value)
-        // {
-        //     m_jsPrototype = value;
-        // }
-
-        // static Napi::Value m_jsPrototype;
     };
 
     class AudioNode : public AudioNodeWrap<AudioNode>
@@ -158,7 +144,6 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
-                    // Napi::ObjectWrap<GainNode>::StaticAccessor("prototype", &GainNode::GetPrototype, &GainNode::SetPrototype)
                     Napi::ObjectWrap<GainNode>::InstanceMethod("connect", &AudioNodeWrap::Connect)
                 });
 
@@ -174,41 +159,10 @@ namespace Babylon::Polyfills::Internal
 
         GainNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<GainNode>{info}
-            , m_jsAudioNode{AudioNode::New(info, info[0])}
         {
             setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
-            return;
-
-            Napi::Function setPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
-            Napi::Function getPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
-
-            //auto audioNodeClass = info.Env().Global().Get("AudioNode");
-            auto audioNodeClass = m_jsAudioNode;
-            auto audioNodeClassProto = getPrototypeOf.Call({audioNodeClass});
-
-            auto gainNodeClassProto = getPrototypeOf.Call({info.This()});
-
-            setPrototypeOf.Call({gainNodeClassProto, audioNodeClassProto});
-            setPrototypeOf.Call({info.This(), m_jsAudioNode});
         }
-
-    private:
-        Napi::Object m_jsAudioNode;
-
-        // static Napi::Value GetPrototype(const Napi::CallbackInfo& info)
-        // {
-        //     return m_jsPrototype;
-        // }
-
-        // static void SetPrototype(const Napi::CallbackInfo& info, const Napi::Value& value)
-        // {
-        //     m_jsPrototype = value;
-        // }
-
-        //static Napi::Value m_jsPrototype;
     };
-
-    // Napi::Value GainNode::m_jsPrototype;
 
     AudioContext::AudioContext(const Napi::CallbackInfo& info)
         : Napi::ObjectWrap<AudioContext>{info}
@@ -236,24 +190,15 @@ namespace Babylon::Polyfills::WebAudio
 {
     void Initialize(Napi::Env env)
     {
+        // Silence LabSound output.
         log_set_quiet(true);
 
         Internal::AudioContext::Initialize(env);
-
         auto audioNodeClass = Internal::AudioNode::Initialize(env);
         auto gainNodeClass = Internal::GainNode::Initialize(env);
 
         Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
-        auto audioNodeClassPrototype = audioNodeClass.Get("prototype");
-        auto gainNodeClassPrototype = gainNodeClass.Get("prototype");
-
-        // Works on Win32 x64 Chakra.
-        // Fails on macOS JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
-        setPrototypeOf.Call({gainNodeClassPrototype, audioNodeClassPrototype});
-
-        // Works on Win32 x64 Chakra.
-        // Works on macOS JavaScriptCore.
-        // Fails on Win32 x64 V8 -> Uncaught Error: Cyclic __proto__ value.
+        setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
         setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
     }
 }
