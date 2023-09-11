@@ -30,12 +30,11 @@ describe("GainNode", function () {
         const audioContext = new AudioContext();
 
         const gainNode = new GainNode(audioContext);
-        const gainNode2 = new GainNode(audioContext);
 
         console.log(gainNode instanceof AudioNode);
 
-        const connectedNode = gainNode.connect(gainNode2);
-        expect(connectedNode).to.equal(gainNode2);
+        const connectedNode = gainNode.connect(audioContext.destination);
+        expect(connectedNode).to.equal(audioContext.destination);
     });
 });
 

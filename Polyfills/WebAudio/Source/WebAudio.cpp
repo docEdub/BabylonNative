@@ -54,8 +54,8 @@ namespace Babylon::Polyfills::Internal
     private:
         Napi::Value GetDestination(const Napi::CallbackInfo& info)
         {
-            assert(m_jsDestinationNode.IsObject());
-            return m_jsDestinationNode;
+            assert(m_jsDestinationNode.Value().IsObject());
+            return m_jsDestinationNode.Value();
         }
 
         Napi::Value CreateGain(const Napi::CallbackInfo& info);
@@ -65,7 +65,7 @@ namespace Babylon::Polyfills::Internal
         std::shared_ptr<lab::AudioContext> m_impl;
         std::shared_ptr<lab::AudioDestinationNode> m_destinationNodeImpl;
 
-        Napi::Object m_jsDestinationNode;
+        Napi::ObjectReference m_jsDestinationNode;
     };
 
     template<class T> class AudioNodeWrap : public Napi::ObjectWrap<T>
@@ -217,8 +217,9 @@ namespace Babylon::Polyfills::Internal
         , m_impl{std::make_shared<lab::AudioContext>(false, true)}
         , m_destinationNodeImpl{std::make_shared<lab::AudioDestinationNode>(*m_impl.get(), m_deviceImpl)}
     {
-        m_jsDestinationNode = AudioNode::New(info, info.This());
-        auto destinationNode = AudioNode::Unwrap(m_jsDestinationNode);
+        m_jsDestinationNode = Napi::Persistent(AudioNode::New(info, info.This()));
+        assert(m_jsDestinationNode.Value().IsObject());
+        auto destinationNode = AudioNode::Unwrap(m_jsDestinationNode.Value());
         destinationNode->setImpl(m_destinationNodeImpl);
 
         m_deviceImpl->setDestinationNode(m_destinationNodeImpl);
