@@ -72,7 +72,36 @@ namespace Babylon::Polyfills::Internal
         Napi::ObjectReference m_jsDestinationNode;
     };
 
-    template<class T> class AudioNodeWrap : public Napi::ObjectWrap<T>
+    class AudioNodeBase
+    {
+        friend class AudioContext;
+
+    public:
+        AudioNodeBase(const Napi::CallbackInfo& info)
+            : m_audioContextImpl{AudioContext::Unwrap(info[0].As<Napi::Object>())->impl()}
+        {
+        }
+
+        Napi::Value Connect(const Napi::CallbackInfo& info);
+
+    protected:
+        template<class ImplT>
+        std::shared_ptr<ImplT> impl() const
+        {
+            return std::reinterpret_pointer_cast<ImplT>(m_impl);
+        }
+
+        void setImpl(std::shared_ptr<lab::AudioNode> impl)
+        {
+            m_impl = std::move(impl);
+        }
+
+        lab::AudioContext& m_audioContextImpl;
+        std::shared_ptr<lab::AudioNode> m_impl;
+    };
+
+    template<class T>
+    class AudioNodeWrap : public Napi::ObjectWrap<T>
     {
         static constexpr auto JS_CLASS_NAME = "AudioNode";
 
@@ -83,7 +112,7 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
-                    Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeWrap::Connect)
+                    Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect)
                 });
 
             env.Global().Set(JS_CLASS_NAME, func);
@@ -93,51 +122,28 @@ namespace Babylon::Polyfills::Internal
 
         AudioNodeWrap(const Napi::CallbackInfo& info)
             : Napi::ObjectWrap<T>(info)
-            , m_audioContextImpl{AudioContext::Unwrap(info[0].As<Napi::Object>())->impl()}
         {
         }
-
-        void setImpl(std::shared_ptr<lab::AudioNode> impl)
-        {
-            m_impl = std::move(impl);
-        }
-
-        Napi::Value Connect(const Napi::CallbackInfo& info)
-        {
-            auto jsDestinationNode = info[0].ToObject();
-            auto destinationNode = T::Unwrap(jsDestinationNode);
-            m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
-            return jsDestinationNode;
-        }
-
-    protected:
-        template<class ImplT>
-        std::shared_ptr<ImplT> impl() const
-        {
-            return std::reinterpret_pointer_cast<ImplT>(m_impl);
-        }
-
-        lab::AudioContext& m_audioContextImpl;
-        std::shared_ptr<lab::AudioNode> m_impl;
     };
 
-    class AudioNode : public AudioNodeWrap<AudioNode>
+    class AudioNode : public AudioNodeWrap<AudioNode>, public AudioNodeBase
     {
         static constexpr auto JS_CLASS_NAME = "AudioNode";
 
     public:
         static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
         {
-            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({ audioContext });
+            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({audioContext});
         }
 
         AudioNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<AudioNode>(info)
+            , AudioNodeBase(info)
         {
         }
     };
 
-    class GainNode : public AudioNodeWrap<GainNode>
+    class GainNode : public AudioNodeWrap<GainNode>, public AudioNodeBase
     {
         static constexpr auto JS_CLASS_NAME = "GainNode";
 
@@ -148,7 +154,7 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
-                    Napi::ObjectWrap<GainNode>::InstanceMethod("connect", &AudioNodeWrap::Connect)
+                    InstanceMethod("connect", &AudioNodeBase::Connect)
                 });
 
             env.Global().Set(JS_CLASS_NAME, func);
@@ -158,11 +164,12 @@ namespace Babylon::Polyfills::Internal
 
         static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
         {
-            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({ audioContext });
+            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({audioContext});
         }
 
         GainNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<GainNode>{info}
+            , AudioNodeBase(info)
         {
             setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
         }
@@ -187,6 +194,14 @@ namespace Babylon::Polyfills::Internal
     Napi::Value AudioContext::CreateGain(const Napi::CallbackInfo& info)
     {
         return GainNode::New(info, info.This());
+    }
+
+    Napi::Value AudioNodeBase::Connect(const Napi::CallbackInfo& info)
+    {
+        auto jsDestinationNode = info[0].ToObject();
+        auto destinationNode = AudioNode::Unwrap(jsDestinationNode);
+        m_audioContextImpl.connect(destinationNode->m_impl, m_impl);
+        return jsDestinationNode;
     }
 }
 
