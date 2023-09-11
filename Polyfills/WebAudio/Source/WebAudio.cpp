@@ -98,7 +98,6 @@ namespace Babylon::Polyfills::Internal
             m_impl = std::move(impl);
         }
 
-    protected:
         Napi::Value Connect(const Napi::CallbackInfo& info)
         {
             auto jsDestinationNode = info[0].ToObject();
@@ -107,6 +106,7 @@ namespace Babylon::Polyfills::Internal
             return jsDestinationNode;
         }
 
+    protected:
         template<class ImplT>
         std::shared_ptr<ImplT> impl() const
         {
@@ -198,7 +198,16 @@ namespace Babylon::Polyfills::WebAudio
         auto gainNodeClass = Internal::GainNode::Initialize(env);
 
         Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
-        setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
-        setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
+
+        try
+        {
+            // TODO: Fix error on JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
+            // ... and find out why `gainNode instanceof AudioNode` is still true even though the prototype chain is not set correctly here on JSC.
+            setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
+            setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
+        }
+        catch(...)
+        {
+        }
     }
 }

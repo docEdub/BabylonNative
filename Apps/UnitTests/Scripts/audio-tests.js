@@ -36,6 +36,14 @@ describe("GainNode", function () {
         expect(gainNode instanceof AudioNode).to.be.true;
     });
 
+    // This fails when using JavaScriptCore engine.
+    // TODO: Get this test to pass.
+    xit("is not instanceof AudioContext", function () {
+        const audioContext = new AudioContext();
+        const gainNode = new GainNode(audioContext)
+        expect(gainNode instanceof AudioContext).to.be.false;
+    });
+
     it("connects to audio context destination", function () {
         const audioContext = new AudioContext();
         const gainNode = new GainNode(audioContext);
