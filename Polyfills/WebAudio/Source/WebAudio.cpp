@@ -163,9 +163,15 @@ namespace Babylon::Polyfills::Internal
                 when = info[0].ToNumber().FloatValue();
             }
 
-            Impl<lab::AudioScheduledSourceNode>()->start(when);
+            Impl()->start(when);
 
             return info.Env().Undefined();
+        }
+
+    private:
+        std::shared_ptr<lab::AudioScheduledSourceNode> Impl() const
+        {
+            return AudioNodeBase::Impl<lab::AudioScheduledSourceNode>();
         }
     };
 
@@ -279,13 +285,18 @@ namespace Babylon::Polyfills::Internal
             : AudioNodeWrap<GainNode>{info}
         {
             SetImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
-            m_jsGain = Napi::Persistent(AudioParam::New(info, Impl<lab::GainNode>()->gain()));
+            m_jsGain = Napi::Persistent(AudioParam::New(info, Impl()->gain()));
         }
 
     private:
         Napi::Value GetGain(const Napi::CallbackInfo& info)
         {
             return m_jsGain.Value();
+        }
+
+        std::shared_ptr<lab::GainNode> Impl() const
+        {
+            return AudioNodeWrap<GainNode>::Impl<lab::GainNode>();
         }
 
         Napi::ObjectReference m_jsGain;
