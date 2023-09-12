@@ -1,5 +1,3 @@
-#include <Babylon/JsRuntimeScheduler.h>
-
 #include <LabSound/LabSound.h>
 #include <LabSound/backends/AudioDevice_RtAudio.h>
 
@@ -7,8 +5,6 @@
 
 namespace Babylon::Polyfills::Internal
 {
-    constexpr auto JS_AUDIO_NODE_CLASS_NAME = "AudioNode";
-
     lab::AudioStreamConfig GetDefaultAudioDeviceConfiguration()
     {
         const std::vector<lab::AudioDeviceInfo> audioDevices = lab::AudioDevice_RtAudio::MakeAudioDeviceList();
@@ -33,7 +29,7 @@ namespace Babylon::Polyfills::Internal
         return outputConfig;
     }
 
-    class AudioContext : public Napi::ObjectWrap<AudioContext>
+    class AudioContext final : public Napi::ObjectWrap<AudioContext>
     {
         static constexpr auto JS_CLASS_NAME = "AudioContext";
 
@@ -53,7 +49,7 @@ namespace Babylon::Polyfills::Internal
 
         AudioContext(const Napi::CallbackInfo& info);
 
-        lab::AudioContext& impl() const { return *m_impl; }
+        lab::AudioContext& Impl() const { return *m_impl; }
 
     private:
         Napi::Value GetDestination(const Napi::CallbackInfo& info)
@@ -64,7 +60,6 @@ namespace Babylon::Polyfills::Internal
 
         Napi::Value CreateGain(const Napi::CallbackInfo& info);
 
-        JsRuntimeScheduler m_runtimeScheduler;
         std::shared_ptr<lab::AudioDevice_RtAudio> m_deviceImpl;
         std::shared_ptr<lab::AudioContext> m_impl;
         std::shared_ptr<lab::AudioDestinationNode> m_destinationNodeImpl;
@@ -76,20 +71,25 @@ namespace Babylon::Polyfills::Internal
     {
     public:
         AudioNodeBase(const Napi::CallbackInfo& info)
-            : m_audioContextImpl{AudioContext::Unwrap(info[0].As<Napi::Object>())->impl()}
+            : m_audioContextImpl{AudioContext::Unwrap(info[0].As<Napi::Object>())->Impl()}
         {
         }
 
         Napi::Value Connect(const Napi::CallbackInfo& info);
 
     protected:
+        lab::AudioContext& AudioContextImpl() const
+        {
+            return m_audioContextImpl;
+        }
+
         template<class ImplT>
-        std::shared_ptr<ImplT> impl() const
+        std::shared_ptr<ImplT> Impl() const
         {
             return std::reinterpret_pointer_cast<ImplT>(m_impl);
         }
 
-        void setImpl(std::shared_ptr<lab::AudioNode> impl)
+        void SetImpl(std::shared_ptr<lab::AudioNode> impl)
         {
             m_impl = std::move(impl);
         }
@@ -99,9 +99,16 @@ namespace Babylon::Polyfills::Internal
     };
 
     template<class T>
-    class AudioNodeWrap : public Napi::ObjectWrap<T>
+    class AudioNodeWrap : public Napi::ObjectWrap<T>, public AudioNodeBase
     {
     public:
+        AudioNodeWrap(const Napi::CallbackInfo& info)
+            : Napi::ObjectWrap<T>(info)
+            , AudioNodeBase(info)
+        {
+        }
+
+    protected:
         template<typename ...Args>
         static const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& Properties(Args&&... args)
         {
@@ -111,59 +118,43 @@ namespace Babylon::Polyfills::Internal
             };
             return properties;
         }
+    };
 
+    class AudioNode final : public AudioNodeWrap<AudioNode>
+    {
+        static constexpr auto JS_CLASS_NAME = "AudioNode";
+
+    public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::Function func = Napi::ObjectWrap<T>::DefineClass(
-                env,
-                JS_AUDIO_NODE_CLASS_NAME,
-                Properties());
-
-            env.Global().Set(JS_AUDIO_NODE_CLASS_NAME, func);
-
+            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            env.Global().Set(JS_CLASS_NAME, func);
             return func;
         }
 
-        AudioNodeWrap(const Napi::CallbackInfo& info)
-            : Napi::ObjectWrap<T>(info)
-        {
-        }
-    };
-
-    class AudioNode : public AudioNodeWrap<AudioNode>, public AudioNodeBase
-    {
-    public:
         static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext, std::shared_ptr<lab::AudioNode> impl)
         {
-            auto jsAudioNode = info.Env().Global().Get(JS_AUDIO_NODE_CLASS_NAME).As<Napi::Function>().New({audioContext});
+            auto jsAudioNode = info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({audioContext});
             auto audioNode = AudioNode::Unwrap(jsAudioNode);
-            audioNode->setImpl(impl);
+            audioNode->SetImpl(impl);
             return jsAudioNode;
         }
 
         AudioNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<AudioNode>(info)
-            , AudioNodeBase(info)
         {
         }
     };
 
-    class GainNode : public AudioNodeWrap<GainNode>, public AudioNodeBase
+    class GainNode final : public AudioNodeWrap<GainNode>
     {
         static constexpr auto JS_CLASS_NAME = "GainNode";
 
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::Function func = ObjectWrap<GainNode>::DefineClass(
-                env,
-                JS_CLASS_NAME,
-                Properties(
-                    ObjectWrap<GainNode>::InstanceAccessor("test", &GainNode::Test, nullptr)
-                ));
-
+            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
             env.Global().Set(JS_CLASS_NAME, func);
-
             return func;
         }
 
@@ -174,21 +165,13 @@ namespace Babylon::Polyfills::Internal
 
         GainNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<GainNode>{info}
-            , AudioNodeBase(info)
         {
-            setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
-        }
-
-    private:
-        Napi::Value Test(const Napi::CallbackInfo& info)
-        {
-            return Napi::Value::From(info.Env(), 1.234);
+            SetImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
         }
     };
 
     AudioContext::AudioContext(const Napi::CallbackInfo& info)
         : Napi::ObjectWrap<AudioContext>{info}
-        , m_runtimeScheduler{JsRuntime::GetFromJavaScript(info.Env())}
         , m_deviceImpl{std::make_shared<lab::AudioDevice_RtAudio>(lab::AudioStreamConfig(), GetDefaultAudioDeviceConfiguration())}
         , m_impl{std::make_shared<lab::AudioContext>(false, true)}
         , m_destinationNodeImpl{std::make_shared<lab::AudioDestinationNode>(*m_impl.get(), m_deviceImpl)}
