@@ -82,16 +82,6 @@ namespace Babylon::Polyfills::Internal
 
         Napi::Value Connect(const Napi::CallbackInfo& info);
 
-        template<typename T>
-        static std::vector<Napi::ClassPropertyDescriptor<T>>& Properties(const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& inherited = {})
-        {
-            static std::vector<Napi::ClassPropertyDescriptor<T>> properties = {
-                Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect)
-            };
-            properties.insert(properties.end(), inherited);
-            return properties;
-        }
-
     protected:
         template<class ImplT>
         std::shared_ptr<ImplT> impl() const
@@ -112,12 +102,22 @@ namespace Babylon::Polyfills::Internal
     class AudioNodeWrap : public Napi::ObjectWrap<T>
     {
     public:
+        template<typename ...Args>
+        static const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& Properties(Args&&... args)
+        {
+            static std::initializer_list<Napi::ClassPropertyDescriptor<T>> properties = {
+                Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect),
+                args ...
+            };
+            return properties;
+        }
+
         static Napi::Function Initialize(Napi::Env env)
         {
             Napi::Function func = Napi::ObjectWrap<T>::DefineClass(
                 env,
                 JS_AUDIO_NODE_CLASS_NAME,
-                AudioNodeBase::Properties<T>());
+                Properties());
 
             env.Global().Set(JS_AUDIO_NODE_CLASS_NAME, func);
 
@@ -158,9 +158,9 @@ namespace Babylon::Polyfills::Internal
             Napi::Function func = ObjectWrap<GainNode>::DefineClass(
                 env,
                 JS_CLASS_NAME,
-                AudioNodeBase::Properties<GainNode>({
+                Properties(
                     ObjectWrap<GainNode>::InstanceAccessor("test", &GainNode::Test, nullptr)
-                }));
+                ));
 
             env.Global().Set(JS_CLASS_NAME, func);
 
