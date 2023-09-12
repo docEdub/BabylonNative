@@ -67,6 +67,55 @@ namespace Babylon::Polyfills::Internal
         Napi::ObjectReference m_jsDestinationNode;
     };
 
+    class AudioParam final : public Napi::ObjectWrap<AudioParam>
+    {
+        static constexpr auto JS_CLASS_NAME = "AudioParam";
+
+    public:
+        static Napi::Function Initialize(Napi::Env env)
+        {
+            Napi::Function func = DefineClass(
+                env,
+                JS_CLASS_NAME,
+                {
+                    InstanceAccessor("value", &AudioParam::GetValue, &AudioParam::SetValue)
+                });
+            env.Global().Set(JS_CLASS_NAME, func);
+            return func;
+        }
+
+        static Napi::Object New(const Napi::CallbackInfo& info, std::shared_ptr<lab::AudioParam> impl)
+        {
+            auto jsAudioParam = info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({});
+            auto audioParam = AudioParam::Unwrap(jsAudioParam);
+            audioParam->SetImpl(impl);
+            return jsAudioParam;
+        }
+
+        AudioParam(const Napi::CallbackInfo& info)
+            : ObjectWrap<AudioParam>(info)
+        {
+        }
+
+        void SetImpl(std::shared_ptr<lab::AudioParam> impl)
+        {
+            m_impl = std::move(impl);
+        }
+
+    private:
+        Napi::Value GetValue(const Napi::CallbackInfo& info)
+        {
+            return Napi::Value::From(info.Env(), m_impl->value());
+        }
+
+        void SetValue(const Napi::CallbackInfo& info, const Napi::Value& value)
+        {
+            m_impl->setValue(value.As<Napi::Number>().FloatValue());
+        }
+
+        std::shared_ptr<lab::AudioParam> m_impl;
+    };
+
     class AudioNodeBase
     {
     public:
@@ -211,7 +260,12 @@ namespace Babylon::Polyfills::Internal
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            Napi::Function func = DefineClass(
+                env,
+                JS_CLASS_NAME,
+                Properties(
+                    InstanceAccessor("gain", &GainNode::GetGain, nullptr)
+                ));
             env.Global().Set(JS_CLASS_NAME, func);
             return func;
         }
@@ -225,7 +279,16 @@ namespace Babylon::Polyfills::Internal
             : AudioNodeWrap<GainNode>{info}
         {
             SetImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
+            m_jsGain = Napi::Persistent(AudioParam::New(info, Impl<lab::GainNode>()->gain()));
         }
+
+    private:
+        Napi::Value GetGain(const Napi::CallbackInfo& info)
+        {
+            return m_jsGain.Value();
+        }
+
+        Napi::ObjectReference m_jsGain;
     };
 
     class OscillatorNode final : public AudioScheduledSourceNodeWrap<OscillatorNode>
@@ -285,6 +348,8 @@ namespace Babylon::Polyfills::WebAudio
         log_set_level(LOGLEVEL_WARN);
 
         Internal::AudioContext::Initialize(env);
+        Internal::AudioParam::Initialize(env);
+
         auto audioNodeClass = Internal::AudioNode::Initialize(env);
         auto audioScheduledSourceNodeClass = Internal::AudioScheduledSourceNode::Initialize(env);
         auto gainNodeClass = Internal::GainNode::Initialize(env);

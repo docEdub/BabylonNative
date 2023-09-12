@@ -32,6 +32,19 @@ describe("GainNode", function () {
          expect(gainNode instanceof GainNode).to.be.true;
      });
 
+    it("sets gain to 1.0 by default", function () {
+        const audioContext = new AudioContext();
+        const gainNode = new GainNode(audioContext);
+        expect(gainNode.gain.value).to.equal(1.0);
+    });
+
+    it("sets gain to given value", function () {
+        const audioContext = new AudioContext();
+        const gainNode = new GainNode(audioContext);
+        gainNode.gain.value = 0.5;
+        expect(gainNode.gain.value).to.equal(0.5);
+    });
+
     it("is instanceof AudioNode", function () {
         const audioContext = new AudioContext();
         const gainNode = new GainNode(audioContext)
@@ -97,6 +110,7 @@ describe("OscillatorNode", function () {
             const audioContext = new AudioContext();
             const oscillatorNode = new OscillatorNode(audioContext);
             const gainNode = new GainNode(audioContext);
+            gainNode.gain.value = 0;
             oscillatorNode.connect(gainNode);
             gainNode.connect(audioContext.destination);
             oscillatorNode.start();
