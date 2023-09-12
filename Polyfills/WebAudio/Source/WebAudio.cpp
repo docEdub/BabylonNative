@@ -168,6 +168,19 @@ namespace Babylon::Polyfills::Internal
             return info.Env().Undefined();
         }
 
+        Napi::Value Stop(const Napi::CallbackInfo& info)
+        {
+            float when = 0.f;
+            if (0 < info.Length())
+            {
+                when = info[0].ToNumber().FloatValue();
+            }
+
+            Impl()->stop(when);
+
+            return info.Env().Undefined();
+        }
+
     private:
         std::shared_ptr<lab::AudioScheduledSourceNode> Impl() const
         {
@@ -211,6 +224,7 @@ namespace Babylon::Polyfills::Internal
         {
             return AudioNodeWrap<T>::Properties(
                 Napi::ObjectWrap<T>::InstanceMethod("start", &AudioScheduledSourceNodeWrap::Start),
+                Napi::ObjectWrap<T>::InstanceMethod("stop", &AudioScheduledSourceNodeWrap::Stop),
                 args...);
         }
     };

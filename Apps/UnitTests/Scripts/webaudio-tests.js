@@ -114,5 +114,19 @@
             }
             expect(start).to.not.throw();
         });
+
+        it("stops without error", function () {
+            function stop() {
+                const audioContext = new AudioContext();
+                const oscillatorNode = new OscillatorNode(audioContext);
+                const gainNode = new GainNode(audioContext);
+                gainNode.gain.value = 0;
+                oscillatorNode.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillatorNode.start();
+                oscillatorNode.stop();
+            }
+            expect(stop).to.not.throw();
+        });
     });
 });
