@@ -52,6 +52,12 @@ describe("GainNode", function () {
         const connectedNode = gainNode.connect(audioContext.destination);
         expect(connectedNode).to.equal(audioContext.destination);
     });
+
+    it("test = 1.234", function () {
+        const audioContext = new AudioContext();
+        const gainNode = new GainNode(audioContext);
+        expect(gainNode.test).to.equal(1.234);
+    });
 });
 
 mocha.run(failures => {

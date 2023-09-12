@@ -82,6 +82,16 @@ namespace Babylon::Polyfills::Internal
 
         Napi::Value Connect(const Napi::CallbackInfo& info);
 
+        template<typename T>
+        static std::vector<Napi::ClassPropertyDescriptor<T>>& Properties(const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& inherited = {})
+        {
+            static std::vector<Napi::ClassPropertyDescriptor<T>> properties = {
+                Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect)
+            };
+            properties.insert(properties.end(), inherited);
+            return properties;
+        }
+
     protected:
         template<class ImplT>
         std::shared_ptr<ImplT> impl() const
@@ -107,9 +117,7 @@ namespace Babylon::Polyfills::Internal
             Napi::Function func = Napi::ObjectWrap<T>::DefineClass(
                 env,
                 JS_AUDIO_NODE_CLASS_NAME,
-                {
-                    Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect)
-                });
+                AudioNodeBase::Properties<T>());
 
             env.Global().Set(JS_AUDIO_NODE_CLASS_NAME, func);
 
@@ -150,9 +158,9 @@ namespace Babylon::Polyfills::Internal
             Napi::Function func = ObjectWrap<GainNode>::DefineClass(
                 env,
                 JS_CLASS_NAME,
-                {
-                    InstanceMethod("connect", &AudioNodeBase::Connect)
-                });
+                AudioNodeBase::Properties<GainNode>({
+                    ObjectWrap<GainNode>::InstanceAccessor("test", &GainNode::Test, nullptr)
+                }));
 
             env.Global().Set(JS_CLASS_NAME, func);
 
@@ -169,6 +177,12 @@ namespace Babylon::Polyfills::Internal
             , AudioNodeBase(info)
         {
             setImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
+        }
+
+    private:
+        Napi::Value Test(const Napi::CallbackInfo& info)
+        {
+            return Napi::Value::From(info.Env(), 1.234);
         }
     };
 
