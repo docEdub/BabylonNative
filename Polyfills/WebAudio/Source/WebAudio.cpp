@@ -98,25 +98,65 @@ namespace Babylon::Polyfills::Internal
         std::shared_ptr<lab::AudioNode> m_impl;
     };
 
+    class AudioScheduledSourceNodeBase : public AudioNodeBase
+    {
+    public:
+        AudioScheduledSourceNodeBase(const Napi::CallbackInfo& info)
+            : AudioNodeBase(info)
+        {
+        }
+
+        Napi::Value Start(const Napi::CallbackInfo& info)
+        {
+            float when = 0.f;
+            if (0 < info.Length())
+            {
+                when = info[0].ToNumber().FloatValue();
+            }
+
+            Impl<lab::AudioScheduledSourceNode>()->start(when);
+
+            return info.Env().Undefined();
+        }
+    };
+
     template<class T>
     class AudioNodeWrap : public Napi::ObjectWrap<T>, public AudioNodeBase
     {
     public:
+        template<typename... Args>
+        static const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& Properties(Args&&... args)
+        {
+            static std::initializer_list<Napi::ClassPropertyDescriptor<T>> properties = {
+                Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect),
+                args...};
+            return properties;
+        }
+
         AudioNodeWrap(const Napi::CallbackInfo& info)
             : Napi::ObjectWrap<T>(info)
             , AudioNodeBase(info)
         {
         }
+    };
+
+    template<class T>
+    class AudioScheduledSourceNodeWrap : public Napi::ObjectWrap<T>, public AudioScheduledSourceNodeBase
+    {
+    public:
+        AudioScheduledSourceNodeWrap(const Napi::CallbackInfo& info)
+            : Napi::ObjectWrap<T>(info)
+            , AudioScheduledSourceNodeBase(info)
+        {
+        }
 
     protected:
-        template<typename ...Args>
+        template<typename... Args>
         static const std::initializer_list<Napi::ClassPropertyDescriptor<T>>& Properties(Args&&... args)
         {
-            static std::initializer_list<Napi::ClassPropertyDescriptor<T>> properties = {
-                Napi::ObjectWrap<T>::InstanceMethod("connect", &AudioNodeBase::Connect),
-                args ...
-            };
-            return properties;
+            return AudioNodeWrap<T>::Properties(
+                Napi::ObjectWrap<T>::InstanceMethod("start", &AudioScheduledSourceNodeWrap::Start),
+                args...);
         }
     };
 
@@ -146,6 +186,24 @@ namespace Babylon::Polyfills::Internal
         }
     };
 
+    class AudioScheduledSourceNode : public AudioScheduledSourceNodeWrap<AudioScheduledSourceNode>
+    {
+        static constexpr auto JS_CLASS_NAME = "AudioScheduledSourceNode";
+
+    public:
+        static Napi::Function Initialize(Napi::Env env)
+        {
+            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            env.Global().Set(JS_CLASS_NAME, func);
+            return func;
+        }
+
+        AudioScheduledSourceNode(const Napi::CallbackInfo& info)
+            : AudioScheduledSourceNodeWrap<AudioScheduledSourceNode>(info)
+        {
+        }
+    };
+
     class GainNode final : public AudioNodeWrap<GainNode>
     {
         static constexpr auto JS_CLASS_NAME = "GainNode";
@@ -167,6 +225,30 @@ namespace Babylon::Polyfills::Internal
             : AudioNodeWrap<GainNode>{info}
         {
             SetImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
+        }
+    };
+
+    class OscillatorNode final : public AudioScheduledSourceNodeWrap<OscillatorNode>
+    {
+        static constexpr auto JS_CLASS_NAME = "OscillatorNode";
+
+    public:
+        static Napi::Function Initialize(Napi::Env env)
+        {
+            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            env.Global().Set(JS_CLASS_NAME, func);
+            return func;
+        }
+
+        static Napi::Object New(const Napi::CallbackInfo& info, Napi::Value audioContext)
+        {
+            return info.Env().Global().Get(JS_CLASS_NAME).As<Napi::Function>().New({audioContext});
+        }
+
+        OscillatorNode(const Napi::CallbackInfo& info)
+            : AudioScheduledSourceNodeWrap<OscillatorNode>{info}
+        {
+            SetImpl(std::make_shared<lab::OscillatorNode>(m_audioContextImpl));
         }
     };
 
@@ -199,21 +281,29 @@ namespace Babylon::Polyfills::WebAudio
 {
     void Initialize(Napi::Env env)
     {
-        // Silence LabSound output.
-        log_set_quiet(true);
+        // Set LabSound log level.
+        log_set_level(LOGLEVEL_WARN);
 
         Internal::AudioContext::Initialize(env);
         auto audioNodeClass = Internal::AudioNode::Initialize(env);
+        auto audioScheduledSourceNodeClass = Internal::AudioScheduledSourceNode::Initialize(env);
         auto gainNodeClass = Internal::GainNode::Initialize(env);
+        auto oscillatorNodeClass = Internal::OscillatorNode::Initialize(env);
 
         Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
 
         try
         {
+            setPrototypeOf.Call({ audioScheduledSourceNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
+            setPrototypeOf.Call({ audioScheduledSourceNodeClass, audioNodeClass });
+
             // TODO: Fix error on JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
             // ... and find out why `gainNode instanceof AudioNode` is still true even though the prototype chain is not set correctly here on JSC.
             setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
             setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
+
+            setPrototypeOf.Call({ oscillatorNodeClass.Get("prototype"), audioScheduledSourceNodeClass.Get("prototype") });
+            setPrototypeOf.Call({ oscillatorNodeClass, audioScheduledSourceNodeClass });
         }
         catch(...)
         {
