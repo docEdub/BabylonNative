@@ -1,7 +1,4 @@
-﻿mocha.setup({ ui: "bdd", reporter: "spec", retries: 5 });
-
-const expect = chai.expect;
-
+﻿
 describe("RequestFile", function () {
     this.timeout(0);
     it("should throw when requesting a URL with no protocol", function () {
@@ -27,7 +24,7 @@ describe("ColorParsing", function () {
     expect(_native.Canvas.parseColor("rgba(16,32,48,64)")).to.equal(0x40302010);
     expect(_native.Canvas.parseColor("rgb(16,     32   ,  48   )")).to.equal(0xFF302010);
     expect(_native.Canvas.parseColor("rgba(    16,     32   ,  48 , 64  )")).to.equal(0x40302010);
-    
+
     it("should throw", function () {
         function incorrectColor() {
             _native.Canvas.parseColor("unknownColor");
@@ -217,7 +214,7 @@ describe("PostProcesses", function() {
                 edge_blur: 1.0,
                 chromatic_aberration: 1.0,
                 distortion: 1.0,
-            };              
+            };
             new BABYLON.LensRenderingPipeline('lensEffects', parameters, scene, 1.0, camera);
         }, done);
     });
@@ -351,15 +348,4 @@ describe("clearTimeout", function () {
         setTimeout(() => { done(); }, 0);
         clearTimeout(undefined);
     });
-});
-
-mocha.run(failures => {
-    // Test program will wait for code to be set before exiting
-    if (failures > 0) {
-        // Failure
-        SetExitCode(1);
-    } else {
-        // Success
-        SetExitCode(0);
-    }
 });

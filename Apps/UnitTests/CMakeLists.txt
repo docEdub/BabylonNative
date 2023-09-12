@@ -4,8 +4,10 @@ if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS) OR (UNIX AND NOT AND
 endif()
 
 set(LOCAL_SCRIPTS
-    "Scripts/audio-tests.js"
-    "Scripts/tests.js")
+    "Scripts/tests-begin.js"
+    "Scripts/tests-end.js"
+    "Scripts/tests.js"
+    "Scripts/webaudio-tests.js")
 
 set(NPM_SCRIPTS
     "../node_modules/babylonjs/babylon.max.js"

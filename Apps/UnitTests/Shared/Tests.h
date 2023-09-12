@@ -56,7 +56,10 @@ int Run(Babylon::Graphics::Device device)
     loader.LoadScript("app:///Scripts/babylonjs.materials.js");
     loader.LoadScript("app:///Scripts/chai.js");
     loader.LoadScript("app:///Scripts/mocha.js");
-    loader.LoadScript("app:///Scripts/audio-tests.js");
+    loader.LoadScript("app:///Scripts/tests-begin.js");
+    //loader.LoadScript("app:///Scripts/tests.js");
+    loader.LoadScript("app:///Scripts/webaudio-tests.js");
+    loader.LoadScript("app:///Scripts/tests-end.js");
 
     device.StartRenderingCurrentFrame();
     device.FinishRenderingCurrentFrame();
