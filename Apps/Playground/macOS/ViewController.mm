@@ -58,6 +58,16 @@ Babylon::Plugins::NativeInput* nativeInput{};
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+
+    // Required for mouseMoved events.
+    NSTrackingArea* trackingArea = [
+        [NSTrackingArea alloc]
+        initWithRect:NSZeroRect
+        options:NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingMouseMoved
+        owner:self
+        userInfo:nil
+        ];
+    [[self view] addTrackingArea:trackingArea];
 }
 
 - (void)uninitialize {
@@ -177,6 +187,15 @@ Babylon::Plugins::NativeInput* nativeInput{};
 
 - (CGFloat)getScreenHeight {
     return [self view].frame.size.height;
+}
+
+- (void)mouseMoved:(NSEvent *) theEvent {
+    if (nativeInput)
+    {
+         NSPoint eventLocation = [theEvent locationInWindow];
+         auto invertedY = [self getScreenHeight] - eventLocation.y;
+         nativeInput->MouseMove(eventLocation.x, invertedY);
+    }
 }
 
 - (void)mouseDown:(NSEvent *) theEvent {
