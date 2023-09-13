@@ -142,4 +142,63 @@
             expect(oscillatorNode.frequency.value).to.equal(220);
         });
     });
+
+    describe("AudioParam", function () {
+        this.timeout(0);
+
+        describe("setTargetAtTime", function () {
+            it("throws correct error when given 0 arguments", function () {
+                function test() {
+                    const audioContext = new AudioContext();
+                    const gainNode = new GainNode(audioContext);
+                    gainNode.gain.setTargetAtTime();
+                }
+                // TODO: Get comparing the thrown error message working in this test.
+                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 0 present."));
+                expect(test).to.throw();
+            });
+
+            it("throws correct error when given 1 argument", function () {
+                function test() {
+                    const audioContext = new AudioContext();
+                    const gainNode = new GainNode(audioContext);
+                    gainNode.gain.setTargetAtTime(1);
+                }
+                // TODO: Get comparing the thrown error message working in this test.
+                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 1 present."));
+                expect(test).to.throw();
+            });
+
+            it("throws correct error when given 2 arguments", function () {
+                function test() {
+                    const audioContext = new AudioContext();
+                    const gainNode = new GainNode(audioContext);
+                    gainNode.gain.setTargetAtTime(1, 2);
+                }
+                // TODO: Get comparing the thrown error message working in this test.
+                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 2 present."));
+                expect(test).to.throw();
+            });
+
+            it("throws correct error when given non-number arguments", function () {
+                function test() {
+                    const audioContext = new AudioContext();
+                    const gainNode = new GainNode(audioContext);
+                    gainNode.gain.setTargetAtTime("", "", "");
+                }
+                // TODO: Get comparing the thrown error message working in this test.
+                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': The provided float value is non-finite."));
+                expect(test).to.throw();
+            });
+
+            it("does not throw when given 3 number arguments", function () {
+                function test() {
+                    const audioContext = new AudioContext();
+                    const gainNode = new GainNode(audioContext);
+                    gainNode.gain.setTargetAtTime(1, 2, 3);
+                }
+                expect(test).not.to.throw();
+            });
+        });
+    });
 });

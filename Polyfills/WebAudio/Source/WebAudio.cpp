@@ -78,7 +78,8 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
-                    InstanceAccessor("value", &AudioParam::GetValue, &AudioParam::SetValue)
+                    InstanceAccessor("value", &AudioParam::GetValue, &AudioParam::SetValue),
+                    InstanceMethod("setTargetAtTime", &AudioParam::SetTargetAtTime)
                 });
             env.Global().Set(JS_CLASS_NAME, func);
             return func;
@@ -111,6 +112,32 @@ namespace Babylon::Polyfills::Internal
         void SetValue(const Napi::CallbackInfo& info, const Napi::Value& value)
         {
             m_impl->setValue(value.As<Napi::Number>().FloatValue());
+        }
+
+        void SetTargetAtTime(const Napi::CallbackInfo& info)
+        {
+            if (info.Length() < 3)
+            {
+                throw Napi::TypeError::New(info.Env(), std::string(
+                    "Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only " + std::to_string(info.Length()) + " present."
+                    ));
+            }
+
+            auto jsTarget = info[0];
+            auto jsStartTime = info[1];
+            auto jsTimeConstant = info[2];
+            if (!jsTarget.IsNumber() || !jsStartTime.IsNumber() || !jsTimeConstant.IsNumber())
+            {
+                throw Napi::TypeError::New(info.Env(),
+                    "Failed to execute 'setTargetAtTime' on 'AudioParam': The provided float value is non-finite."
+                    );
+            }
+
+            auto target = jsTarget.As<Napi::Number>().FloatValue();
+            auto startTime = jsStartTime.As<Napi::Number>().FloatValue();
+            auto timeConstant = jsTimeConstant.As<Napi::Number>().FloatValue();
+
+            m_impl->setTargetAtTime(target, startTime, timeConstant);
         }
 
         std::shared_ptr<lab::AudioParam> m_impl;
