@@ -310,7 +310,7 @@ namespace Babylon::Polyfills::Internal
 
         std::shared_ptr<lab::GainNode> Impl() const
         {
-            return AudioNodeWrap<GainNode>::Impl<lab::GainNode>();
+            return AudioNodeBase::Impl<lab::GainNode>();
         }
 
         Napi::ObjectReference m_jsGain;
