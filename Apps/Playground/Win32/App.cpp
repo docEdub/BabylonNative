@@ -21,6 +21,7 @@
 #include <Babylon/Plugins/NativeInput.h>
 #include <Babylon/Plugins/TestUtils.h>
 #include <Babylon/Polyfills/Console.h>
+#include <Babylon/Polyfills/WebAudio.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
 #include <Babylon/Polyfills/Canvas.h>
@@ -132,6 +133,8 @@ namespace
                 printf("%s", message);
                 fflush(stdout);
             });
+
+            Babylon::Polyfills::WebAudio::Initialize(env);
 
             Babylon::Polyfills::Window::Initialize(env);
 
