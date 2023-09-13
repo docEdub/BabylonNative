@@ -10,6 +10,7 @@
 #import <Babylon/Plugins/NativeXr.h>
 #import <Babylon/Polyfills/Canvas.h>
 #import <Babylon/Polyfills/Console.h>
+#import <Babylon/Polyfills/WebAudio.h>
 #import <Babylon/Polyfills/Window.h>
 #import <Babylon/Polyfills/XMLHttpRequest.h>
 
@@ -74,6 +75,8 @@ bool isXrActive{};
         });
 
         nativeCanvas.emplace(Babylon::Polyfills::Canvas::Initialize(env));
+        
+        Babylon::Polyfills::WebAudio::Initialize(env);
 
         Babylon::Polyfills::Window::Initialize(env);
 

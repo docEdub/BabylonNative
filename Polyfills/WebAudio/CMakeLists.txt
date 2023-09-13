@@ -12,8 +12,15 @@ target_include_directories(WebAudio
 target_link_libraries(WebAudio
     PUBLIC napi
     PRIVATE JsRuntimeInternal
-    PRIVATE LabSound
-    PRIVATE LabSoundRtAudio)
+    PRIVATE LabSound)
+
+if(IOS)
+    target_link_libraries(WebAudio
+        PRIVATE LabSoundMiniAudio)
+else()
+    target_link_libraries(WebAudio
+        PRIVATE LabSoundRtAudio)
+endif()
 
 if(APPLE)
     find_library(AUDIO_TOOLBOX AudioToolbox)
@@ -21,12 +28,6 @@ if(APPLE)
         message(FATAL_ERROR "AudioToolbox framework not found")
     endif()
     target_link_libraries(WebAudio PRIVATE ${AUDIO_TOOLBOX})
-
-    find_library(AUDIO_UNIT AudioUnit)
-    if(NOT AUDIO_UNIT)
-        message(FATAL_ERROR "AudioUnit framework not found")
-    endif()
-    target_link_libraries(WebAudio PRIVATE ${AUDIO_UNIT})
 
     find_library(ACCELERATE Accelerate)
     if(NOT ACCELERATE)
@@ -40,11 +41,19 @@ if(APPLE)
     endif()
     target_link_libraries(WebAudio PRIVATE ${CORE_AUDIO})
 
-    find_library(COCOA Cocoa)
-    if(NOT COCOA)
-        message(FATAL_ERROR "Cocoa framework not found")
+    if(NOT IOS)
+        find_library(AUDIO_UNIT AudioUnit)
+        if(NOT AUDIO_UNIT)
+            message(FATAL_ERROR "AudioUnit framework not found")
+        endif()
+        target_link_libraries(WebAudio PRIVATE ${AUDIO_UNIT})
+
+        find_library(COCOA Cocoa)
+        if(NOT COCOA)
+            message(FATAL_ERROR "Cocoa framework not found")
+        endif()
+        target_link_libraries(WebAudio PRIVATE ${COCOA})
     endif()
-    target_link_libraries(WebAudio PRIVATE ${COCOA})
 endif()
 
 set_property(TARGET WebAudio PROPERTY FOLDER Polyfills)

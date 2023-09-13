@@ -1,5 +1,5 @@
 #include <LabSound/LabSound.h>
-#include <LabSound/backends/AudioDevice_RtAudio.h>
+#include <LabSound/backends/AudioDevice_Miniaudio.h>
 
 #include <napi/napi.h>
 
@@ -7,7 +7,7 @@ namespace Babylon::Polyfills::Internal
 {
     lab::AudioStreamConfig GetDefaultAudioDeviceConfiguration()
     {
-        const std::vector<lab::AudioDeviceInfo> audioDevices = lab::AudioDevice_RtAudio::MakeAudioDeviceList();
+        const std::vector<lab::AudioDeviceInfo> audioDevices = lab::AudioDevice_Miniaudio::MakeAudioDeviceList();
 
         lab::AudioDeviceInfo defaultOutputInfo;
         for (auto& info : audioDevices)
@@ -60,7 +60,7 @@ namespace Babylon::Polyfills::Internal
 
         Napi::Value CreateGain(const Napi::CallbackInfo& info);
 
-        std::shared_ptr<lab::AudioDevice_RtAudio> m_deviceImpl;
+        std::shared_ptr<lab::AudioDevice_Miniaudio> m_deviceImpl;
         std::shared_ptr<lab::AudioContext> m_impl;
         std::shared_ptr<lab::AudioDestinationNode> m_destinationNodeImpl;
 
@@ -388,7 +388,7 @@ namespace Babylon::Polyfills::Internal
 
     AudioContext::AudioContext(const Napi::CallbackInfo& info)
         : Napi::ObjectWrap<AudioContext>{info}
-        , m_deviceImpl{std::make_shared<lab::AudioDevice_RtAudio>(lab::AudioStreamConfig(), GetDefaultAudioDeviceConfiguration())}
+        , m_deviceImpl{std::make_shared<lab::AudioDevice_Miniaudio>(lab::AudioStreamConfig(), GetDefaultAudioDeviceConfiguration())}
         , m_impl{std::make_shared<lab::AudioContext>(false, true)}
         , m_destinationNodeImpl{std::make_shared<lab::AudioDestinationNode>(*m_impl.get(), m_deviceImpl)}
     {
