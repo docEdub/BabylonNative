@@ -128,5 +128,18 @@
             }
             expect(stop).to.not.throw();
         });
+
+        it("sets frequency to 440 by default", function () {
+            const audioContext = new AudioContext();
+            const oscillatorNode = new OscillatorNode(audioContext);
+            expect(oscillatorNode.frequency.value).to.equal(440);
+        });
+
+        it("sets frequency to given value", function () {
+            const audioContext = new AudioContext();
+            const oscillatorNode = new OscillatorNode(audioContext);
+            oscillatorNode.frequency.value = 220;
+            expect(oscillatorNode.frequency.value).to.equal(220);
+        });
     });
 });

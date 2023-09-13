@@ -323,7 +323,12 @@ namespace Babylon::Polyfills::Internal
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            Napi::Function func = DefineClass(
+                env,
+                JS_CLASS_NAME,
+                Properties(
+                    InstanceAccessor("frequency", &OscillatorNode::GetFrequency, nullptr)
+                ));
             env.Global().Set(JS_CLASS_NAME, func);
             return func;
         }
@@ -337,7 +342,21 @@ namespace Babylon::Polyfills::Internal
             : AudioScheduledSourceNodeWrap<OscillatorNode>{info}
         {
             SetImpl(std::make_shared<lab::OscillatorNode>(m_audioContextImpl));
+            m_jsFrequency = Napi::Persistent(AudioParam::New(info, Impl()->frequency()));
         }
+
+    private:
+        Napi::Value GetFrequency(const Napi::CallbackInfo& info)
+        {
+            return m_jsFrequency.Value();
+        }
+
+        std::shared_ptr<lab::OscillatorNode> Impl() const
+        {
+            return AudioNodeBase::Impl<lab::OscillatorNode>();
+        }
+
+        Napi::ObjectReference m_jsFrequency;
     };
 
     AudioContext::AudioContext(const Napi::CallbackInfo& info)
