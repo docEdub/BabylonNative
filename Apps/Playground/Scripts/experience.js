@@ -1,6 +1,6 @@
 /// <reference path="../../node_modules/babylonjs/babylon.module.d.ts" />
 
-// See https://playground.babylonjs.com/#VZ99Q8#9.
+// See https://playground.babylonjs.com/#VZ99Q8#10.
 
 var logfps = false;
 
@@ -85,10 +85,10 @@ scene.onPointerObservable.add((pointerInfo) => {
     let pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh == hitPlane; });
     if (pickInfo.hit) {
         var targetVolume = maxVolume * (pickInfo.pickedPoint.y + frameSize) / (2 * frameSize);
-        //gainNode.gain.setTargetAtTime(targetVolume, 0, audioParamChangeTimeInSeconds);
+        gainNode.gain.setTargetAtTime(targetVolume, 0, audioParamChangeTimeInSeconds);
 
         var targetPitch = minPitch + (maxPitch - minPitch) * ((pickInfo.pickedPoint.x + frameSize) / (2 * frameSize));
-        //oscillatorNode.frequency.setTargetAtTime(targetPitch, 0, audioParamChangeTimeInSeconds);
+        oscillatorNode.frequency.setTargetAtTime(targetPitch, 0, audioParamChangeTimeInSeconds);
 
         pitchAxisIndicator.position.x = pickInfo.pickedPoint.x;
         volumeAxisIndicator.position.y = pickInfo.pickedPoint.y;
@@ -96,7 +96,7 @@ scene.onPointerObservable.add((pointerInfo) => {
         frame.material.diffuseColor.set(0.75, 1, 0.75);
     }
     else {
-        //gainNode.gain.setTargetAtTime(0, 0, audioParamChangeTimeInSeconds);
+        gainNode.gain.setTargetAtTime(0, 0, audioParamChangeTimeInSeconds);
         frame.material.diffuseColor.set(1, 1, 1);
     }
 });
