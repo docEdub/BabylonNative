@@ -19,7 +19,7 @@ FetchContent_Declare(AndroidExtensions
     GIT_TAG 883c4a286116e51ee989e39ee8e216d632997329)
 FetchContent_Declare(LabSound
     GIT_REPOSITORY https://github.com/docEdub/LabSound.git
-    GIT_TAG f4cbafee956d5119cd76a0ccf2e8a44f5f13df56)
+    GIT_TAG 992d9c349f9ab98255a4ccf2c3ca14f3ac2d48b7)
 set(JSRUNTIMEHOST_TESTS OFF)
 
 set(CONTENT_TO_FETCH cmake-extensions JsRuntimeHost LabSound)
