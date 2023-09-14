@@ -12,15 +12,8 @@ target_include_directories(WebAudio
 target_link_libraries(WebAudio
     PUBLIC napi
     PRIVATE JsRuntimeInternal
-    PRIVATE LabSound)
-
-if(IOS)
-    target_link_libraries(WebAudio
-        PRIVATE LabSoundMiniAudio)
-else()
-    target_link_libraries(WebAudio
-        PRIVATE LabSoundRtAudio)
-endif()
+    PRIVATE LabSound
+    PRIVATE LabSoundMiniAudio)
 
 if(APPLE)
     find_library(AUDIO_TOOLBOX AudioToolbox)
