@@ -1,3 +1,11 @@
+FetchContent_Declare(LabSound
+    GIT_REPOSITORY https://github.com/docEdub/LabSound.git
+    GIT_TAG 992d9c349f9ab98255a4ccf2c3ca14f3ac2d48b7)
+
+message(STATUS "Fetching dependencies for WebAudio (LabSound)")
+FetchContent_MakeAvailable(LabSound)
+message(STATUS "Fetching dependencies for WebAudio - done")
+
 set(SOURCES
     "Include/Babylon/Polyfills/WebAudio.h"
     "Source/WebAudio.cpp")
