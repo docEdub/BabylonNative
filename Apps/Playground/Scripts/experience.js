@@ -1,6 +1,6 @@
 /// <reference path="../../node_modules/babylonjs/babylon.module.d.ts" />
 
-// See https://playground.babylonjs.com/#VZ99Q8#11.
+// See https://playground.babylonjs.com/#VZ99Q8#12.
 
 var logfps = false;
 
@@ -46,13 +46,13 @@ frame.material.backFaceCulling = false;
 
 var volumeAxisIndicator = BABYLON.MeshBuilder.CreateSphere("volumeAxisIndicator");
 volumeAxisIndicator.material = new BABYLON.StandardMaterial("volumeAxisIndicator.material");
-volumeAxisIndicator.material.diffuseColor.set(1, 0, 0);
+volumeAxisIndicator.material.diffuseColor.set(0, 0, 1);
 volumeAxisIndicator.scaling.setAll(axisIndicatorSize * 0.75);
 volumeAxisIndicator.position.x = -frameSize;
 
 var pitchAxisIndicator = BABYLON.MeshBuilder.CreateSphere("pitchAxisIndicator");
 pitchAxisIndicator.material = new BABYLON.StandardMaterial("pitchAxisIndicator.material");
-pitchAxisIndicator.material.diffuseColor.set(0, 0, 1);
+pitchAxisIndicator.material.diffuseColor.set(1, 0, 0);
 pitchAxisIndicator.scaling.setAll(axisIndicatorSize * 0.75);
 pitchAxisIndicator.position.y = -frameSize;
 
