@@ -6,6 +6,7 @@
 #include <Babylon/Plugins/NativeOptimizations.h>
 #include <Babylon/Plugins/NativeXr.h>
 #include <Babylon/Polyfills/Console.h>
+#include <Babylon/Polyfills/WebAudio.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
 #include <Babylon/Polyfills/Canvas.h>
@@ -385,6 +386,8 @@ void App::RestartRuntime(Windows::Foundation::Rect bounds)
         });
 
         m_nativeCanvas.emplace(Babylon::Polyfills::Canvas::Initialize(env));
+
+        Babylon::Polyfills::WebAudio::Initialize(env);
 
         Babylon::Polyfills::Window::Initialize(env);
 
