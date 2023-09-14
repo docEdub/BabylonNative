@@ -6,14 +6,14 @@ include(FetchContent)
 
 # Modules declaration
 FetchContent_Declare(cmake-extensions
-    GIT_REPOSITORY https://github.com/BabylonJS/CMakeExtensions.git
-    GIT_TAG 366dc4a84fb20f4060d97e89948c343e74c51fc3)
+    GIT_REPOSITORY https://github.com/docEdub/CMakeExtensions.git
+    GIT_TAG b305ff6462bc11deef824b0daf5f3623be72bc87)
 FetchContent_Declare(ios-cmake
     GIT_REPOSITORY https://github.com/leetal/ios-cmake.git
     GIT_TAG 04d91f6675dabb3c97df346a32f6184b0a7ef845)
 FetchContent_Declare(JsRuntimeHost
     GIT_REPOSITORY https://github.com/docEdub/JsRuntimeHost.git
-    GIT_TAG 85d8d91be3c157bf61857c1e1346444024794142)
+    GIT_TAG b75849b08e59db34bd40181eba4e206fa06df24f)
 FetchContent_Declare(AndroidExtensions
     GIT_REPOSITORY https://github.com/BabylonJS/AndroidExtensions.git
     GIT_TAG 883c4a286116e51ee989e39ee8e216d632997329)
