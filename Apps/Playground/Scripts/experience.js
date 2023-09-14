@@ -7,7 +7,7 @@ var logfps = false;
 var engine = new BABYLON.NativeEngine();
 var scene = new BABYLON.Scene(engine);
 
-var camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2, 12, BABYLON.Vector3.Zero(), scene);
+var camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2, 20, BABYLON.Vector3.Zero(), scene);
 var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -2), scene);
 light.intensity = 0.7;
 
