@@ -56,4 +56,5 @@ target_link_libraries(BabylonNativeJNI
     NativeXr
     ScriptLoader
     XMLHttpRequest
+    WebAudio
     Window)

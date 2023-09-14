@@ -1,6 +1,7 @@
 #include <LabSound/LabSound.h>
 #include <LabSound/backends/AudioDevice_Miniaudio.h>
 
+#include <memory>
 #include <napi/napi.h>
 
 namespace Babylon::Polyfills::Internal
@@ -162,7 +163,7 @@ namespace Babylon::Polyfills::Internal
         template<class ImplT>
         std::shared_ptr<ImplT> Impl() const
         {
-            return std::reinterpret_pointer_cast<ImplT>(m_impl);
+            return std::static_pointer_cast<ImplT>(m_impl);
         }
 
         void SetImpl(std::shared_ptr<lab::AudioNode> impl)

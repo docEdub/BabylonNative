@@ -1,6 +1,6 @@
 FetchContent_Declare(LabSound
     GIT_REPOSITORY https://github.com/docEdub/LabSound.git
-    GIT_TAG b1b16dc058df68bb67d65e0232f9d719bec111ca)
+    GIT_TAG c4505da1ccdb92b2ac1c91840666850982dc4258)
 
 message(STATUS "Fetching dependencies for WebAudio (LabSound)")
 FetchContent_MakeAvailable(LabSound)
