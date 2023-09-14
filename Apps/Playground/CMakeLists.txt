@@ -80,10 +80,11 @@ elseif(WINDOWS_STORE)
         ${APPX_ASSETS}
         "UWP/App.cpp"
         "UWP/App.h")
-    set(ADDITIONAL_LIBRARIES
-        PRIVATE NativeXr
-        PRIVATE mmdevapi
-    )
+    set(ADDITIONAL_LIBRARIES PRIVATE NativeXr)
+
+        # Required for miniaudio to get default audio device.
+        # The original miniaudio code tried to bind to mmdevapi.dll at runtime, but that's not working; probably because mmdevapi.dll is not in the built UWP package.
+    set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE mmdevapi)
 elseif(WIN32)
     set(SOURCES
         ${SOURCES}
