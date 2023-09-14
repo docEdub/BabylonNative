@@ -1,6 +1,6 @@
 FetchContent_Declare(LabSound
     GIT_REPOSITORY https://github.com/docEdub/LabSound.git
-    GIT_TAG 26ce2b4aae26ee9e17afffdd555564e9dcfd7dda)
+    GIT_TAG b1b16dc058df68bb67d65e0232f9d719bec111ca)
 
 message(STATUS "Fetching dependencies for WebAudio (LabSound)")
 FetchContent_MakeAvailable(LabSound)
@@ -21,7 +21,8 @@ target_link_libraries(WebAudio
     PUBLIC napi
     PRIVATE JsRuntimeInternal
     PRIVATE LabSound
-    PRIVATE LabSoundMiniAudio)
+    PRIVATE LabSoundMiniAudio
+    )
 
 if(APPLE)
     find_library(AUDIO_TOOLBOX AudioToolbox)

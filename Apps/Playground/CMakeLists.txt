@@ -80,7 +80,10 @@ elseif(WINDOWS_STORE)
         ${APPX_ASSETS}
         "UWP/App.cpp"
         "UWP/App.h")
-    set(ADDITIONAL_LIBRARIES PRIVATE NativeXr)
+    set(ADDITIONAL_LIBRARIES
+        PRIVATE NativeXr
+        PRIVATE mmdevapi
+    )
 elseif(WIN32)
     set(SOURCES
         ${SOURCES}
