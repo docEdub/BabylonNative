@@ -1,6 +1,6 @@
 /// <reference path="../../node_modules/babylonjs/babylon.module.d.ts" />
 
-// See https://playground.babylonjs.com/#VZ99Q8#10.
+// See https://playground.babylonjs.com/#VZ99Q8#11.
 
 var logfps = false;
 
