@@ -6,7 +6,7 @@
 	url = https://github.com/KhronosGroup/glslang
 [submodule "SPIRV-Cross"]
 	path = Dependencies/SPIRV-Cross
-	url = https://github.com/KhronosGroup/SPIRV-Cross
+	url = https://github.com/docEdub/SPIRV-Cross
 [submodule "bgfx.cmake"]
 	path = Dependencies/bgfx.cmake
 	url = https://github.com/BabylonJS/bgfx.cmake
