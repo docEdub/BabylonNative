@@ -41,6 +41,7 @@ namespace Babylon::Polyfills::Internal
                 env,
                 JS_CLASS_NAME,
                 {
+                    StaticMethod(Napi::Symbol::WellKnown(env, "hasInstance"), &AudioContext::HasInstance),
                     InstanceAccessor("destination", &AudioContext::GetDestination, nullptr),
                     InstanceMethod("createGain", &AudioContext::CreateGain)
                 });
@@ -53,6 +54,21 @@ namespace Babylon::Polyfills::Internal
         lab::AudioContext& Impl() const { return *m_impl; }
 
     private:
+        static Napi::Value HasInstance(const Napi::CallbackInfo& info)
+        {
+            auto getPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
+            auto prototype = getPrototypeOf.Call({info[0]});
+            while (prototype != info.Env().Null())
+            {
+                if (prototype == getPrototypeOf.Call({info.Env().Global().Get(JS_CLASS_NAME)}))
+                {
+                    return Napi::Value::From(info.Env(), true);
+                }
+                prototype = getPrototypeOf.Call({prototype});
+            }
+            return Napi::Value::From(info.Env(), false);
+        }
+
         Napi::Value GetDestination(const Napi::CallbackInfo& info)
         {
             assert(m_jsDestinationNode.Value().IsObject());
@@ -264,7 +280,12 @@ namespace Babylon::Polyfills::Internal
     public:
         static Napi::Function Initialize(Napi::Env env)
         {
-            Napi::Function func = DefineClass(env, JS_CLASS_NAME, Properties());
+            Napi::Function func = DefineClass(
+                env,
+                JS_CLASS_NAME,
+                Properties(
+                    StaticMethod(Napi::Symbol::WellKnown(env, "hasInstance"), &AudioNode::HasInstance)
+                ));
             env.Global().Set(JS_CLASS_NAME, func);
             return func;
         }
@@ -280,6 +301,22 @@ namespace Babylon::Polyfills::Internal
         AudioNode(const Napi::CallbackInfo& info)
             : AudioNodeWrap<AudioNode>(info)
         {
+        }
+
+    private:
+        static Napi::Value HasInstance(const Napi::CallbackInfo& info)
+        {
+            auto getPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
+            auto prototype = getPrototypeOf.Call({info[0]});
+            while (prototype != info.Env().Null())
+            {
+                if (prototype == getPrototypeOf.Call({info.Env().Global().Get(JS_CLASS_NAME)}))
+                {
+                    return Napi::Value::From(info.Env(), true);
+                }
+                prototype = getPrototypeOf.Call({prototype});
+            }
+            return Napi::Value::From(info.Env(), false);
         }
     };
 
@@ -301,7 +338,7 @@ namespace Babylon::Polyfills::Internal
         }
     };
 
-    class GainNode final : public AudioNodeWrap<GainNode>
+    class GainNode final : public Napi::ObjectWrap<GainNode>, public AudioNodeBase
     {
         static constexpr auto JS_CLASS_NAME = "GainNode";
 
@@ -311,9 +348,10 @@ namespace Babylon::Polyfills::Internal
             Napi::Function func = DefineClass(
                 env,
                 JS_CLASS_NAME,
-                Properties(
-                    InstanceAccessor("gain", &GainNode::GetGain, nullptr)
-                ));
+                                              {//Properties(
+                                                 StaticMethod(Napi::Symbol::WellKnown(env, "hasInstance"), &GainNode::HasInstance),
+                                                  InstanceAccessor("gain", &GainNode::GetGain, nullptr)
+                                              });//));
             env.Global().Set(JS_CLASS_NAME, func);
             return func;
         }
@@ -324,13 +362,29 @@ namespace Babylon::Polyfills::Internal
         }
 
         GainNode(const Napi::CallbackInfo& info)
-            : AudioNodeWrap<GainNode>{info}
+            : ObjectWrap<GainNode>{info}
+            , AudioNodeBase(info)
         {
             SetImpl(std::make_shared<lab::GainNode>(m_audioContextImpl));
             m_jsGain = Napi::Persistent(AudioParam::New(info, Impl()->gain()));
         }
 
     private:
+        static Napi::Value HasInstance(const Napi::CallbackInfo& info)
+        {
+            auto getPrototypeOf = info.Env().Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
+            auto prototype = getPrototypeOf.Call({info[0]});
+            while (prototype != info.Env().Null())
+            {
+                if (prototype == getPrototypeOf.Call({info.Env().Global().Get(JS_CLASS_NAME)}))
+                {
+                    return Napi::Value::From(info.Env(), true);
+                }
+                prototype = getPrototypeOf.Call({prototype});
+            }
+            return Napi::Value::From(info.Env(), false);
+        }
+
         Napi::Value GetGain(const Napi::CallbackInfo& info)
         {
             return m_jsGain.Value();
@@ -419,6 +473,7 @@ namespace Babylon::Polyfills::WebAudio
         // Set LabSound log level.
         log_set_level(LOGLEVEL_WARN);
 
+        Internal::DummyBase::Initialize(env);
         Internal::AudioContext::Initialize(env);
         Internal::AudioParam::Initialize(env);
 
@@ -427,23 +482,27 @@ namespace Babylon::Polyfills::WebAudio
         auto gainNodeClass = Internal::GainNode::Initialize(env);
         auto oscillatorNodeClass = Internal::OscillatorNode::Initialize(env);
 
+        Napi::Function getPrototypeOf = env.Global().Get("Object").ToObject().Get("getPrototypeOf").As<Napi::Function>();
         Napi::Function setPrototypeOf = env.Global().Get("Object").ToObject().Get("setPrototypeOf").As<Napi::Function>();
 
-        try
-        {
-            setPrototypeOf.Call({ audioScheduledSourceNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
-            setPrototypeOf.Call({ audioScheduledSourceNodeClass, audioNodeClass });
+        setPrototypeOf.Call({getPrototypeOf.Call({env.Global().Get("GainNode")}), getPrototypeOf.Call({env.Global().Get("AudioNode")})});
+        setPrototypeOf.Call({getPrototypeOf.Call({env.Global().Get("OscillatorNode")}), getPrototypeOf.Call({env.Global().Get("AudioNode")})});
 
-            // TODO: Fix error on JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
-            // ... and find out why `gainNode instanceof AudioNode` is still true even though the prototype chain is not set correctly here on JSC.
-            setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
-            setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
-
-            setPrototypeOf.Call({ oscillatorNodeClass.Get("prototype"), audioScheduledSourceNodeClass.Get("prototype") });
-            setPrototypeOf.Call({ oscillatorNodeClass, audioScheduledSourceNodeClass });
-        }
-        catch(...)
-        {
-        }
+//        try
+//        {
+//            setPrototypeOf.Call({ audioScheduledSourceNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
+//            setPrototypeOf.Call({ audioScheduledSourceNodeClass, audioNodeClass });
+//
+//            // TODO: Fix error on JavaScriptCore -> Uncaught Error: Cannot set prototype of immutable prototype object.
+//            // ... and find out why `gainNode instanceof AudioNode` is still true even though the prototype chain is not set correctly here on JSC.
+//            setPrototypeOf.Call({ gainNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
+//            setPrototypeOf.Call({ gainNodeClass, audioNodeClass });
+//
+//            setPrototypeOf.Call({ oscillatorNodeClass.Get("prototype"), audioScheduledSourceNodeClass.Get("prototype") });
+//            setPrototypeOf.Call({ oscillatorNodeClass, audioScheduledSourceNodeClass });
+//        }
+//        catch(...)
+//        {
+//        }
     }
 }

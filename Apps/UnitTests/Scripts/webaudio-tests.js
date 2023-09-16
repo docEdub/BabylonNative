@@ -37,7 +37,7 @@
 
         // This fails when using JavaScriptCore engine.
         // TODO: Get this test to pass when using JavaScriptCore engine.
-        xit("is not instanceof AudioContext", function () {
+        it("is not instanceof AudioContext", function () {
             const audioContext = new AudioContext();
             const gainNode = new GainNode(audioContext)
             expect(gainNode instanceof AudioContext).to.be.false;

@@ -64,8 +64,28 @@ xyPositionIndicator.scaling.setAll(axisIndicatorSize);
 var hitPlane = BABYLON.MeshBuilder.CreatePlane("hitPlane", { size: 2 * frameSize });
 hitPlane.material = frame.material;
 
+// Object.defineProperty(GainNode, Symbol.hasInstance, {
+//     value: function(inst) {
+//         console.log(`gainNode hasInstance called!`);
+//         return false;
+//     }
+// });
+if (GainNode instanceof AudioNode) {
+    console.log(`GainNode instanceof AudioNode === true`);
+}
+else {
+    console.log(`GainNode instanceof AudioNode === false`);
+}
+if (AudioNode instanceof GainNode) {
+    console.log(`AudioNode instanceof GainNode === true`);
+}
+else {
+    console.log(`AudioNode instanceof GainNode === false`);
+}
+
 var audioContext = new AudioContext();
 var gainNode = new GainNode(audioContext);
+window.gainNode = gainNode;
 var oscillatorNode = new OscillatorNode(audioContext);
 
 if (!(engine instanceof BABYLON.NativeEngine)) {
