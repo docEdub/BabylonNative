@@ -501,7 +501,10 @@ namespace Babylon::Polyfills::WebAudio
         }
         catch (const Napi::Error& error)
         {
-            const auto& msg = error.Message();
+            if (error.Message() != "Cyclic __proto__ value")
+            {
+                throw error;
+            }
 
             // This works in Chakra and V8, but not in JavaScriptCore.
             setPrototypeOf.Call({ audioScheduledSourceNodeClass.Get("prototype"), audioNodeClass.Get("prototype") });
