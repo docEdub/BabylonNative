@@ -347,6 +347,10 @@ namespace Babylon::Polyfills::Internal
         }
     };
 
+    // Deriving this from AudioNodeWrap<GainNode> makes JavaScriptCore return true from GainNode instanceof AudioContext.
+    // Deriving this from Napi::ObjectWrap<GainNode> and AudioNodeBase makes V8 throw "TypeError: Illegal invocation on gainNode.connect (which follows the prototype chain to AudioNode.connnect).
+    // Either derivation structure works in Chakra.
+    // TODO: Try leaving the prototype chains alone and just implementing hasInstance on all exposed classes.
     class GainNode final : public AudioNodeWrap<GainNode>
     {
         static constexpr auto JS_CLASS_NAME = "GainNode";
