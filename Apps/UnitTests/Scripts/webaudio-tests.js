@@ -1,4 +1,5 @@
-﻿describe("WebAudio", function () {
+﻿
+describe("WebAudio", function () {
     describe("AudioContext", function () {
         this.timeout(0);
 
@@ -64,141 +65,141 @@
         });
     });
 
-    describe("OscillatorNode", function () {
-        this.timeout(0);
+     describe("OscillatorNode", function () {
+         this.timeout(0);
 
-        it("is constructable", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            expect(oscillatorNode).to.not.be.null;
-            expect(oscillatorNode).to.not.be.undefined;
-            expect(oscillatorNode instanceof OscillatorNode).to.be.true;
-        });
+         it("is constructable", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             expect(oscillatorNode).to.not.be.null;
+             expect(oscillatorNode).to.not.be.undefined;
+             expect(oscillatorNode instanceof OscillatorNode).to.be.true;
+         });
 
-        it("is instanceof AudioNode", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            expect(oscillatorNode instanceof AudioNode).to.be.true;
-        });
+         it("is instanceof AudioNode", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             expect(oscillatorNode instanceof AudioNode).to.be.true;
+         });
 
-        it("is instanceof AudioScheduledSourceNode", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            expect(oscillatorNode instanceof AudioScheduledSourceNode).to.be.true;
-        });
+         it("is instanceof AudioScheduledSourceNode", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             expect(oscillatorNode instanceof AudioScheduledSourceNode).to.be.true;
+         });
 
-        it("connects to audio context destination", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            const connectedNode = oscillatorNode.connect(audioContext.destination);
-            expect(connectedNode).to.equal(audioContext.destination);
-        });
+         it("connects to audio context destination", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             const connectedNode = oscillatorNode.connect(audioContext.destination);
+             expect(connectedNode).to.equal(audioContext.destination);
+         });
 
-        it("connects to gain node", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            const gainNode = new GainNode(audioContext);
-            const connectedNode = oscillatorNode.connect(gainNode);
-            expect(connectedNode).to.equal(gainNode);
-        });
+         it("connects to gain node", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             const gainNode = new GainNode(audioContext);
+             const connectedNode = oscillatorNode.connect(gainNode);
+             expect(connectedNode).to.equal(gainNode);
+         });
 
-        it("starts without error", function () {
-            function start() {
-                const audioContext = new AudioContext();
-                const oscillatorNode = new OscillatorNode(audioContext);
-                const gainNode = new GainNode(audioContext);
-                gainNode.gain.value = 0;
-                oscillatorNode.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillatorNode.start();
-            }
-            expect(start).to.not.throw();
-        });
+         it("starts without error", function () {
+             function start() {
+                 const audioContext = new AudioContext();
+                 const oscillatorNode = new OscillatorNode(audioContext);
+                 const gainNode = new GainNode(audioContext);
+                 gainNode.gain.value = 0;
+                 oscillatorNode.connect(gainNode);
+                 gainNode.connect(audioContext.destination);
+                 oscillatorNode.start();
+             }
+             expect(start).to.not.throw();
+         });
 
-        it("stops without error", function () {
-            function stop() {
-                const audioContext = new AudioContext();
-                const oscillatorNode = new OscillatorNode(audioContext);
-                const gainNode = new GainNode(audioContext);
-                gainNode.gain.value = 0;
-                oscillatorNode.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillatorNode.start();
-                oscillatorNode.stop();
-            }
-            expect(stop).to.not.throw();
-        });
+         it("stops without error", function () {
+             function stop() {
+                 const audioContext = new AudioContext();
+                 const oscillatorNode = new OscillatorNode(audioContext);
+                 const gainNode = new GainNode(audioContext);
+                 gainNode.gain.value = 0;
+                 oscillatorNode.connect(gainNode);
+                 gainNode.connect(audioContext.destination);
+                 oscillatorNode.start();
+                 oscillatorNode.stop();
+             }
+             expect(stop).to.not.throw();
+         });
 
-        it("sets frequency to 440 by default", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            expect(oscillatorNode.frequency.value).to.equal(440);
-        });
+         it("sets frequency to 440 by default", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             expect(oscillatorNode.frequency.value).to.equal(440);
+         });
 
-        it("sets frequency to given value", function () {
-            const audioContext = new AudioContext();
-            const oscillatorNode = new OscillatorNode(audioContext);
-            oscillatorNode.frequency.value = 220;
-            expect(oscillatorNode.frequency.value).to.equal(220);
-        });
-    });
+         it("sets frequency to given value", function () {
+             const audioContext = new AudioContext();
+             const oscillatorNode = new OscillatorNode(audioContext);
+             oscillatorNode.frequency.value = 220;
+             expect(oscillatorNode.frequency.value).to.equal(220);
+         });
+     });
 
-    describe("AudioParam", function () {
-        this.timeout(0);
+     describe("AudioParam", function () {
+         this.timeout(0);
 
-        describe("setTargetAtTime", function () {
-            it("throws correct error when given 0 arguments", function () {
-                function test() {
-                    const audioContext = new AudioContext();
-                    const gainNode = new GainNode(audioContext);
-                    gainNode.gain.setTargetAtTime();
-                }
-                // TODO: Get comparing the thrown error message working in this test.
-                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 0 present."));
-                expect(test).to.throw();
-            });
+         describe("setTargetAtTime", function () {
+             it("throws correct error when given 0 arguments", function () {
+                 function test() {
+                     const audioContext = new AudioContext();
+                     const gainNode = new GainNode(audioContext);
+                     gainNode.gain.setTargetAtTime();
+                 }
+                 // TODO: Get comparing the thrown error message working in this test.
+                 //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 0 present."));
+                 expect(test).to.throw();
+             });
 
-            it("throws correct error when given 1 argument", function () {
-                function test() {
-                    const audioContext = new AudioContext();
-                    const gainNode = new GainNode(audioContext);
-                    gainNode.gain.setTargetAtTime(1);
-                }
-                // TODO: Get comparing the thrown error message working in this test.
-                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 1 present."));
-                expect(test).to.throw();
-            });
+             it("throws correct error when given 1 argument", function () {
+                 function test() {
+                     const audioContext = new AudioContext();
+                     const gainNode = new GainNode(audioContext);
+                     gainNode.gain.setTargetAtTime(1);
+                 }
+                 // TODO: Get comparing the thrown error message working in this test.
+                 //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 1 present."));
+                 expect(test).to.throw();
+             });
 
-            it("throws correct error when given 2 arguments", function () {
-                function test() {
-                    const audioContext = new AudioContext();
-                    const gainNode = new GainNode(audioContext);
-                    gainNode.gain.setTargetAtTime(1, 2);
-                }
-                // TODO: Get comparing the thrown error message working in this test.
-                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 2 present."));
-                expect(test).to.throw();
-            });
+             it("throws correct error when given 2 arguments", function () {
+                 function test() {
+                     const audioContext = new AudioContext();
+                     const gainNode = new GainNode(audioContext);
+                     gainNode.gain.setTargetAtTime(1, 2);
+                 }
+                 // TODO: Get comparing the thrown error message working in this test.
+                 //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': 3 arguments required, but only 2 present."));
+                 expect(test).to.throw();
+             });
 
-            it("throws correct error when given non-number arguments", function () {
-                function test() {
-                    const audioContext = new AudioContext();
-                    const gainNode = new GainNode(audioContext);
-                    gainNode.gain.setTargetAtTime("", "", "");
-                }
-                // TODO: Get comparing the thrown error message working in this test.
-                //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': The provided float value is non-finite."));
-                expect(test).to.throw();
-            });
+             it("throws correct error when given non-number arguments", function () {
+                 function test() {
+                     const audioContext = new AudioContext();
+                     const gainNode = new GainNode(audioContext);
+                     gainNode.gain.setTargetAtTime("", "", "");
+                 }
+                 // TODO: Get comparing the thrown error message working in this test.
+                 //expect(test).to.throw(new TypeError("Failed to execute 'setTargetAtTime' on 'AudioParam': The provided float value is non-finite."));
+                 expect(test).to.throw();
+             });
 
-            it("does not throw when given 3 number arguments", function () {
-                function test() {
-                    const audioContext = new AudioContext();
-                    const gainNode = new GainNode(audioContext);
-                    gainNode.gain.setTargetAtTime(1, 2, 3);
-                }
-                expect(test).not.to.throw();
-            });
-        });
-    });
+             it("does not throw when given 3 number arguments", function () {
+                 function test() {
+                     const audioContext = new AudioContext();
+                     const gainNode = new GainNode(audioContext);
+                     gainNode.gain.setTargetAtTime(1, 2, 3);
+                 }
+                 expect(test).not.to.throw();
+             });
+         });
+     });
 });

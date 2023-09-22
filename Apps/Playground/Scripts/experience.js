@@ -2,6 +2,8 @@
 
 // See https://playground.babylonjs.com/#VZ99Q8#12.
 
+//debugger;
+
 var logfps = false;
 
 var engine = new BABYLON.NativeEngine();
@@ -83,43 +85,46 @@ else {
     console.log(`AudioNode instanceof GainNode === false`);
 }
 
-var audioContext = new AudioContext();
-var gainNode = new GainNode(audioContext);
-window.gainNode = gainNode;
-var oscillatorNode = new OscillatorNode(audioContext);
+//var audioContext = new AudioContext();
+//var gainNode = new GainNode(audioContext);
+//window.gainNode = gainNode;
+//var oscillatorNode = new OscillatorNode(audioContext);
 
-if (!(engine instanceof BABYLON.NativeEngine)) {
-    console.log(`Adding click event listener to unlock audio context on user input`);
-    document.body.addEventListener('click', () => {
-        audioContext.resume();
-    });
-}
+//if (!(engine instanceof BABYLON.NativeEngine)) {
+//    console.log(`Adding click event listener to unlock audio context on user input`);
+//    document.body.addEventListener('click', () => {
+//        audioContext.resume();
+//    });
+//}
 
-oscillatorNode.connect(gainNode);
-gainNode.connect(audioContext.destination);
+//oscillatorNode.connect(gainNode);
+//gainNode.connect(audioContext.destination);
 
-gainNode.gain.value = 0;
-oscillatorNode.start();
+//gainNode.gain.value = 0;
+//oscillatorNode.start();
 
-scene.onPointerObservable.add((pointerInfo) => {
-    let pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh == hitPlane; });
-    if (pickInfo.hit) {
-        var targetVolume = maxVolume * (pickInfo.pickedPoint.y + frameSize) / (2 * frameSize);
-        gainNode.gain.setTargetAtTime(targetVolume, 0, audioParamChangeTimeInSeconds);
+//scene.onPointerObservable.add((pointerInfo) => {
+//    let pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh == hitPlane; });
+//    if (pickInfo.hit) {
+//        var targetVolume = maxVolume * (pickInfo.pickedPoint.y + frameSize) / (2 * frameSize);
+//        gainNode.gain.setTargetAtTime(targetVolume, 0, audioParamChangeTimeInSeconds);
 
-        var targetPitch = minPitch + (maxPitch - minPitch) * ((pickInfo.pickedPoint.x + frameSize) / (2 * frameSize));
-        oscillatorNode.frequency.setTargetAtTime(targetPitch, 0, audioParamChangeTimeInSeconds);
+//        var targetPitch = minPitch + (maxPitch - minPitch) * ((pickInfo.pickedPoint.x + frameSize) / (2 * frameSize));
+//        oscillatorNode.frequency.setTargetAtTime(targetPitch, 0, audioParamChangeTimeInSeconds);
 
-        pitchAxisIndicator.position.x = pickInfo.pickedPoint.x;
-        volumeAxisIndicator.position.y = pickInfo.pickedPoint.y;
-        xyPositionIndicator.position.set(pickInfo.pickedPoint.x, pickInfo.pickedPoint.y, 0);
-        frame.material.diffuseColor.set(0.75, 1, 0.75);
-    }
-    else {
-        gainNode.gain.setTargetAtTime(0, 0, audioParamChangeTimeInSeconds);
-        frame.material.diffuseColor.set(1, 1, 1);
-    }
-});
+//        pitchAxisIndicator.position.x = pickInfo.pickedPoint.x;
+//        volumeAxisIndicator.position.y = pickInfo.pickedPoint.y;
+//        xyPositionIndicator.position.set(pickInfo.pickedPoint.x, pickInfo.pickedPoint.y, 0);
+//        frame.material.diffuseColor.set(0.75, 1, 0.75);
+//    }
+//    else {
+//        gainNode.gain.setTargetAtTime(0, 0, audioParamChangeTimeInSeconds);
+//        frame.material.diffuseColor.set(1, 1, 1);
+//    }
+//});
+
+let gainNode = new GainNode();
+debugger;
 
 if (logfps) {
     var logFpsLoop = () => {
