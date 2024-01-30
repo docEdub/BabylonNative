@@ -66,6 +66,7 @@ namespace Babylon
         else
         {
             bgfx::VertexLayout layout{};
+
             layout.begin();
 
             auto attribType{static_cast<bgfx::AttribType::Enum>(type)};
@@ -86,6 +87,7 @@ namespace Babylon
             {
                 layout.add(attrib, static_cast<uint8_t>(numElements), bgfx::AttribType::Float);
                 layout.m_stride = static_cast<uint16_t>(sizeof(float) * numElements);
+                layout.m_offset[attrib] = static_cast<uint16_t>(byteOffset % byteStride);
                 vertexBuffer->PromoteToFloats(attribType, numElements, byteOffset, byteStride);
             }
             else
@@ -102,7 +104,7 @@ namespace Babylon
                 return false;
             }
 
-            m_vertexBufferRecords[attrib] = {vertexBuffer, byteOffset / byteStride, bgfx::createVertexLayout(layout)};
+            m_vertexBufferRecords[attrib] = {vertexBuffer, byteOffset, bgfx::createVertexLayout(layout)};
         }
         return true;
     }

@@ -45,5 +45,6 @@ namespace Babylon
         };
 
         bool m_disposed{};
+        bgfx::VertexLayout m_layout;
     };
 }

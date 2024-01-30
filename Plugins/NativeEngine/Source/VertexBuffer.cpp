@@ -3,26 +3,41 @@
 
 namespace
 {
-    template<typename sourceType>
-    void PromoteToFloats(std::vector<uint8_t>& bytes, uint32_t numElements, uint32_t byteOffset, uint32_t byteStride)
-    {
-        const size_t count = bytes.size() / byteStride;
-        const size_t destinationSize = count * numElements * sizeof(float);
-        if (destinationSize != bytes.size()) // ensure both vectors have different size
-        {
-            std::vector<uint8_t> newBytes(destinationSize);
-            float* destination = reinterpret_cast<float*>(newBytes.data());
-            for (size_t i = 0; i < count; ++i)
-            {
-                sourceType* source = reinterpret_cast<sourceType*>(bytes.data() + byteOffset + byteStride * i);
-                for (size_t element = 0; element < numElements; element++)
-                {
-                    *destination++ = static_cast<float>(*source++);
-                }
-            }
-            bytes.swap(newBytes);
-        }
-    }
+   template<typename sourceType>
+   bool PromoteToFloats(std::vector<uint8_t>& bytes, uint32_t numElements, uint32_t byteOffset, uint32_t byteStride)
+   {
+       const size_t count = (bytes.size() - byteOffset) / byteStride;
+       const size_t destinationSize = count * numElements * sizeof(float);
+       if (destinationSize != (bytes.size() + byteOffset))
+       {
+           std::vector<uint8_t> newBytes(destinationSize + byteOffset);
+
+           //If we are in an Offset array, copy the previews data.
+           if(byteOffset != 0)
+           {
+              std::memcpy(reinterpret_cast<void*>(newBytes.data()), reinterpret_cast<void*>(bytes.data()), bytes.size());
+           }
+
+           float* destination = reinterpret_cast<float*>(newBytes.data() + byteOffset);
+
+           for (size_t i = 0; i < count; ++i)
+           {
+               sourceType* source = reinterpret_cast<sourceType*>((bytes.data() + byteOffset) + byteStride * i);
+               
+               for (size_t element = 0; element < numElements; element++)
+               {
+                  float newValue = static_cast<float>(*source++);
+                   *destination++ = newValue;
+               }
+           }
+
+           bytes.swap(newBytes);
+
+           return true;
+       }
+
+       return false;
+   }
 }
 
 namespace Babylon
@@ -132,26 +147,28 @@ namespace Babylon
 
     void VertexBuffer::PromoteToFloats(bgfx::AttribType::Enum attribType, uint32_t numElements, uint32_t byteOffset, uint32_t byteStride)
     {
+       bool hasSizeChanged = false;
+
         switch (attribType)
         {
             case bgfx::AttribType::Int8:
             {
-                ::PromoteToFloats<int8_t>(*m_bytes, numElements, byteOffset, byteStride);
+                hasSizeChanged  = ::PromoteToFloats<int8_t>(*m_bytes, numElements, byteOffset, byteStride);
                 break;
             }
             case bgfx::AttribType::Uint8:
             {
-                ::PromoteToFloats<uint8_t>(*m_bytes, numElements, byteOffset, byteStride);
+                hasSizeChanged  = ::PromoteToFloats<uint8_t>(*m_bytes, numElements, byteOffset, byteStride);
                 break;
             }
             case bgfx::AttribType::Int16:
             {
-                ::PromoteToFloats<int16_t>(*m_bytes, numElements, byteOffset, byteStride);
+                hasSizeChanged  = ::PromoteToFloats<int16_t>(*m_bytes, numElements, byteOffset, byteStride);
                 break;
             }
             case bgfx::AttribType::Uint16:
             {
-                ::PromoteToFloats<uint16_t>(*m_bytes, numElements, byteOffset, byteStride);
+                hasSizeChanged  = ::PromoteToFloats<uint16_t>(*m_bytes, numElements, byteOffset, byteStride);
                 break;
             }
             case bgfx::AttribType::Uint10: // is supported by any format ?
@@ -159,6 +176,23 @@ namespace Babylon
             {
                 throw std::runtime_error("Unable to promote vertex stream to a float array.");
             }
+        }
+
+        if (hasSizeChanged)
+        {
+           if (bgfx::isValid(m_handle))
+           {
+               if (m_dynamic)
+               {
+                   bgfx::destroy(m_dynamicHandle);
+               }
+               else
+               {
+                   bgfx::destroy(m_handle);
+               }
+
+               m_handle = BGFX_INVALID_HANDLE;
+           }
         }
     }
 
