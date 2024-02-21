@@ -152,36 +152,12 @@ namespace Babylon::Graphics
             return Rect{};
         }
 
-        x = std::round(x);
-        y = std::round(y);
-        width = std::round(width);
-        height = std::round(height);
+        float minX = std::max(0.0f, std::round(x));
+        float minY = std::max(0.0f, std::round(y));
+        float maxX = std::min(std::round(x + width), static_cast<float>(Width()));
+        float maxY = std::min(std::round(y + height), static_cast<float>(Height()));
 
-        if (x < 0.0f)
-        {
-            width += x;
-            x = 0.0f;
-        }
-
-        if (y < 0.0f)
-        {
-            height += y;
-            y = 0.0f;
-        }
-
-        if (Width() < x + width)
-        {
-            width = Width() - x;
-        }
-
-        if (Height() < y + height)
-        {
-            height = Height() - y;
-        }
-
-        y = (Height() - y) - height;
-
-        return Rect{x, y, width, height};
+        return Rect{minX, minY, maxX - minX, maxY - minY};
     }
 
     void FrameBuffer::SetBgfxViewPortAndScissor(bgfx::Encoder& encoder, const Rect& viewPort, const Rect& scissor)
