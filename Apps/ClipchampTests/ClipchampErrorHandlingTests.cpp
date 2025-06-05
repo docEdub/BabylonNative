@@ -61,23 +61,30 @@ protected:
             Babylon::Graphics::Configuration config{};
             config.Device = mtlDevice;
             config.Window = view;
-            config.Width = static_cast<size_t>(width);
-            config.Height = static_cast<size_t>(height);
+            config.Width = width;
+            config.Height = height;
             
             device = std::make_unique<Babylon::Graphics::Device>(config);
+            
+            // Create runtime but don't run it immediately to avoid threading issues in tests
+            runtime = std::make_unique<Babylon::AppRuntime>();
+            
+            return true;
 #else
             Babylon::Graphics::Configuration config{};
-            config.Width = static_cast<size_t>(width);
-            config.Height = static_cast<size_t>(height);
+            config.Width = width;
+            config.Height = height;
             
             device = std::make_unique<Babylon::Graphics::Device>(config);
-#endif
-            
             runtime = std::make_unique<Babylon::AppRuntime>();
-            return true;
             
+            return true;
+#endif
         } catch (const std::exception& e) {
-            error = std::string("Bridge Error: ") + e.what();
+            error = std::string("Bridge Error: Initialization failed - ") + e.what();
+            return false;
+        } catch (...) {
+            error = "Bridge Error: Unknown initialization error";
             return false;
         }
     }

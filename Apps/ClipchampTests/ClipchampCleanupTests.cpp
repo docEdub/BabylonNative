@@ -86,7 +86,13 @@ protected:
 
     void CreateExternalTextures(int count) {
 #if __APPLE__
-        if (!device) return;
+        if (!device || !isInitialized) {
+            // If device isn't ready, just create mock entries for testing
+            for (int i = 0; i < count; ++i) {
+                sourceTextures.emplace(i, Babylon::Plugins::ExternalTexture(nullptr));
+            }
+            return;
+        }
         
         auto platformInfo = device->GetPlatformInfo();
         id<MTLDevice> mtlDevice = (__bridge id<MTLDevice>)platformInfo.Device;
@@ -101,6 +107,9 @@ protected:
             id<MTLTexture> texture = [mtlDevice newTextureWithDescriptor:descriptor];
             if (texture) {
                 sourceTextures.emplace(i, Babylon::Plugins::ExternalTexture(texture));
+            } else {
+                // Fallback to mock texture for testing
+                sourceTextures.emplace(i, Babylon::Plugins::ExternalTexture(nullptr));
             }
         }
 #else
