@@ -6,4 +6,9 @@ if((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS AND NOT VISIONOS) OR (UNI
     add_subdirectory(UnitTests)
 endif()
 
+# Add Clipchamp-specific tests
+if(APPLE OR (UNIX AND NOT ANDROID))
+    add_subdirectory(ClipchampTests)
+endif()
+
 npm(install --silent)
