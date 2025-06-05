@@ -1,10 +1,13 @@
 #include "gtest/gtest.h"
 #include <memory>
 #include <unordered_map>
+#include <future>
+#include <chrono>
 
 #include <Babylon/AppRuntime.h>
 #include <Babylon/Graphics/Device.h>
 #include <Babylon/Plugins/ExternalTexture.h>
+#include <Babylon/Plugins/NativeEngine.h>
 #include <Babylon/ScriptLoader.h>
 
 #if __APPLE__
@@ -48,12 +51,26 @@ protected:
             deviceUpdate = std::make_unique<Babylon::Graphics::DeviceUpdate>(device->GetUpdate("update"));
             runtime = std::make_unique<Babylon::AppRuntime>();
             
-            // Initialize Babylon services
-            runtime->Dispatch([this](Napi::Env env) {
-                device->AddToJavaScript(env);
-                Babylon::Plugins::NativeEngine::Initialize(env);
-                isInitialized = true;
+            // Initialize Babylon services and wait for completion
+            std::promise<void> initPromise;
+            std::future<void> initFuture = initPromise.get_future();
+            
+            runtime->Dispatch([this, &initPromise](Napi::Env env) {
+                try {
+                    device->AddToJavaScript(env);
+                    Babylon::Plugins::NativeEngine::Initialize(env);
+                    isInitialized = true;
+                    initPromise.set_value();
+                } catch (...) {
+                    initPromise.set_exception(std::current_exception());
+                }
             });
+            
+            // Wait for initialization to complete (with timeout)
+            if (initFuture.wait_for(std::chrono::seconds(5)) == std::future_status::timeout) {
+                throw std::runtime_error("Initialization timed out");
+            }
+            initFuture.get(); // Re-throw any exceptions from initialization
         }
 #else
         Babylon::Graphics::Configuration config{};
