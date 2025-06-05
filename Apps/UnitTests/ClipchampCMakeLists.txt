@@ -1,0 +1,105 @@
+cmake_minimum_required(VERSION 3.21)
+project(ClipchampBabylonNativeTests)
+
+# This CMakeLists.txt is specifically for Clipchamp's BabylonNative tests
+# and supports iOS platform testing
+
+set(SCRIPTS
+    "Scripts/tests.js")
+
+# Use local babylon.js files if available, otherwise use external scripts
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../node_modules/babylonjs/babylon.max.js")
+    set(EXTERNAL_SCRIPTS
+        "../node_modules/babylonjs/babylon.max.js"
+        "../node_modules/babylonjs-materials/babylonjs.materials.js"
+        "../node_modules/chai/chai.js"
+        "../node_modules/mocha/mocha.js")
+else()
+    message(WARNING "External scripts not found, tests may not have full functionality")
+    set(EXTERNAL_SCRIPTS "")
+endif()
+
+set(SOURCES
+    "Shared/Shared.h"
+    "Shared/ClipchampTests.cpp"
+    "Shared/ClipchampIOSTests.cpp"
+    "Shared/ClipchampJavaScriptTests.cpp")
+
+# Platform-specific sources
+if(APPLE)
+    find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
+    find_library(METAL_LIBRARY Metal)
+    find_library(METALKIT_LIBRARY MetalKit)
+    find_library(FOUNDATION_LIBRARY Foundation)
+    find_library(UIKIT_LIBRARY UIKit)
+    
+    set(ADDITIONAL_LIBRARIES 
+        PRIVATE ${JAVASCRIPTCORE_LIBRARY}
+        PRIVATE ${METAL_LIBRARY}
+        PRIVATE ${METALKIT_LIBRARY}
+        PRIVATE ${FOUNDATION_LIBRARY})
+    
+    if(IOS)
+        set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE ${UIKIT_LIBRARY})
+        set(SOURCES ${SOURCES} "Apple/App.mm")
+    else()
+        set(SOURCES ${SOURCES} "Apple/App.mm")
+    endif()
+elseif(UNIX AND NOT ANDROID)
+    set(SOURCES ${SOURCES} "X11/App.cpp")
+elseif(WIN32)
+    set(SOURCES ${SOURCES} "Win32/App.cpp")
+endif()
+
+add_executable(ClipchampBabylonNativeTests ${SCRIPTS} ${EXTERNAL_SCRIPTS} ${SOURCES})
+set_property(TARGET ClipchampBabylonNativeTests PROPERTY UNITY_BUILD false)
+
+# Link required BabylonNative libraries
+target_link_libraries(ClipchampBabylonNativeTests
+    PRIVATE AppRuntime
+    PRIVATE Canvas
+    PRIVATE Console
+    PRIVATE ExternalTexture
+    PRIVATE Graphics
+    PRIVATE NativeEngine
+    PRIVATE ScriptLoader
+    PRIVATE UrlLib
+    PRIVATE Window
+    PRIVATE XMLHttpRequest
+    PRIVATE gtest_main
+    ${ADDITIONAL_LIBRARIES})
+
+# Add test registration
+add_test(NAME ClipchampBabylonNativeTests COMMAND ClipchampBabylonNativeTests)
+
+# iOS-specific configuration
+if(IOS)
+    set_target_properties(ClipchampBabylonNativeTests PROPERTIES
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.clipchamp.babylonnative.tests"
+        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "iPhone Developer"
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "11.0")
+endif()
+
+# Copy runtime dependencies
+add_custom_command(TARGET ClipchampBabylonNativeTests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:$<TARGET_RUNTIME_DLLS:ClipchampBabylonNativeTests>>,copy,true> $<TARGET_RUNTIME_DLLS:ClipchampBabylonNativeTests> $<TARGET_FILE_DIR:ClipchampBabylonNativeTests> COMMAND_EXPAND_LISTS)
+
+# Copy script files if they exist
+foreach(SCRIPT ${SCRIPTS} ${EXTERNAL_SCRIPTS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}")
+        get_filename_component(SCRIPT_NAME "${SCRIPT}" NAME)
+        add_custom_command(
+            OUTPUT "${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
+            COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}" "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
+            COMMENT "Copying ${SCRIPT_NAME}"
+            MAIN_DEPENDENCY "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}")
+    endif()
+endforeach()
+
+set_property(TARGET ClipchampBabylonNativeTests PROPERTY FOLDER Apps)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${SCRIPTS})
+if(EXTERNAL_SCRIPTS)
+    source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/../node_modules PREFIX node_modules FILES ${EXTERNAL_SCRIPTS})
+endif()

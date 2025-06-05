@@ -14,7 +14,10 @@ set(EXTERNAL_SCRIPTS
 
 set(SOURCES
     "Shared/Shared.h"
-    "Shared/Shared.cpp")
+    "Shared/Shared.cpp"
+    "Shared/ClipchampTests.cpp"
+    "Shared/ClipchampIOSTests.cpp"
+    "Shared/ClipchampJavaScriptTests.cpp")
 
 if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
@@ -33,6 +36,7 @@ target_link_libraries(UnitTests
     PRIVATE AppRuntime
     PRIVATE Canvas
     PRIVATE Console
+    PRIVATE ExternalTexture
     PRIVATE GraphicsDevice
     PRIVATE NativeEngine
     PRIVATE ScriptLoader
