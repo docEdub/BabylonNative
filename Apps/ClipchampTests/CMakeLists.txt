@@ -1,12 +1,5 @@
-cmake_minimum_required(VERSION 3.18)
-
-project(ClipchampBabylonNativeTests)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Platform check - only build on supported platforms
-if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS AND NOT VISIONOS) OR (UNIX AND NOT ANDROID AND NOT APPLE)))
+# Build only on supported platforms (matching UnitTests pattern)
+if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS) OR (UNIX AND NOT ANDROID)))
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
@@ -20,7 +13,7 @@ set(SOURCES
     TestMain.cpp
 )
 
-# Platform-specific source files
+# Platform-specific configurations
 if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
     find_library(METAL_LIBRARY Metal)

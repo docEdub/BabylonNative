@@ -1,0 +1,4 @@
+/Users/andy/-/code/Clipchamp/clipchamp-mobile/BabylonNative/Apps/ClipchampTests/build/CMakeFiles/ClipchampBabylonNativeTests.dir
+/Users/andy/-/code/Clipchamp/clipchamp-mobile/BabylonNative/Apps/ClipchampTests/build/CMakeFiles/test.dir
+/Users/andy/-/code/Clipchamp/clipchamp-mobile/BabylonNative/Apps/ClipchampTests/build/CMakeFiles/edit_cache.dir
+/Users/andy/-/code/Clipchamp/clipchamp-mobile/BabylonNative/Apps/ClipchampTests/build/CMakeFiles/rebuild_cache.dir
