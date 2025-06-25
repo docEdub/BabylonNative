@@ -14,17 +14,11 @@
 #include <Babylon/AppRuntime.h>
 #include <Babylon/Graphics/Device.h>
 #include <Babylon/ScriptLoader.h>
-#include <Babylon/Plugins/NativeCapture.h>
 #include <Babylon/Plugins/NativeEngine.h>
 #include <Babylon/Plugins/NativeOptimizations.h>
-#include <Babylon/Plugins/NativeCamera.h>
-#include <Babylon/Plugins/NativeInput.h>
-#include <Babylon/Plugins/TestUtils.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
-#include <Babylon/Polyfills/Canvas.h>
-#include <Babylon/ShaderCache.h>
 #include <Babylon/DebugTrace.h>
 
 #define MAX_LOADSTRING 100
@@ -34,10 +28,8 @@ HINSTANCE hInst;                     // current instance
 WCHAR szTitle[MAX_LOADSTRING];       // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING]; // the main window class name
 std::optional<Babylon::AppRuntime> runtime{};
-std::optional<Babylon::Graphics::Device> device{};
-std::optional<Babylon::Graphics::DeviceUpdate> update{};
-Babylon::Plugins::NativeInput* nativeInput{};
-std::optional<Babylon::Polyfills::Canvas> nativeCanvas{};
+std::unique_ptr<Babylon::Graphics::Device> device{};
+std::unique_ptr<Babylon::Graphics::DeviceUpdate> update{};
 bool minimized{false};
 int buttonRefCount{0};
 
@@ -49,6 +41,18 @@ INT_PTR CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 
 namespace
 {
+    void BeginFrame()
+    {
+        device->StartRenderingCurrentFrame();
+        update->Start();
+    }
+
+    void EndFrame()
+    {
+        update->Finish();
+        device->FinishRenderingCurrentFrame();
+    }
+
     const char* GetLogLevelString(Babylon::Polyfills::Console::LogLevel logLevel)
     {
         switch (logLevel)
@@ -77,27 +81,6 @@ namespace
         return {url};
     }
 
-    std::vector<std::string> GetCommandLineArguments()
-    {
-        int argc;
-        auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-        std::vector<std::string> arguments{};
-        arguments.reserve(argc);
-
-        for (int idx = 1; idx < argc; idx++)
-        {
-            std::wstring hstr{argv[idx]};
-            int bytesRequired = ::WideCharToMultiByte(CP_UTF8, 0, &hstr[0], static_cast<int>(hstr.size()), nullptr, 0, nullptr, nullptr);
-            arguments.push_back(std::string(bytesRequired, 0));
-            ::WideCharToMultiByte(CP_UTF8, 0, hstr.data(), static_cast<int>(hstr.size()), arguments.back().data(), bytesRequired, nullptr, nullptr);
-        }
-
-        LocalFree(argv);
-
-        return arguments;
-    }
-
     void Uninitialize()
     {
         if (device)
@@ -106,22 +89,14 @@ namespace
             device->FinishRenderingCurrentFrame();
         }
 
-        nativeCanvas.reset();
-        nativeInput = {};
         runtime.reset();
         update.reset();
         device.reset();
     }
 
-    void RefreshBabylon(HWND hWnd)
+    void InitBabylonNative(HWND hWnd)
     {
         Uninitialize();
-
-        RECT rect;
-        if (!GetClientRect(hWnd, &rect))
-        {
-            return;
-        }
 
         Babylon::DebugTrace::EnableDebugTrace(true);
         Babylon::DebugTrace::SetTraceOutput([](const char* trace) {
@@ -129,27 +104,16 @@ namespace
             OutputDebugStringA("\n");
         });
 
-        auto width = static_cast<size_t>(rect.right - rect.left);
-        auto height = static_cast<size_t>(rect.bottom - rect.top);
+        Babylon::Graphics::Configuration config;
 
-        Babylon::Graphics::Configuration graphicsConfig{};
-        graphicsConfig.Window = hWnd;
-        graphicsConfig.Width = width;
-        graphicsConfig.Height = height;
-        graphicsConfig.MSAASamples = 4;
+        device = std::make_unique<::Babylon::Graphics::Device>(config);
+        update = std::make_unique<::Babylon::Graphics::DeviceUpdate>(device->GetUpdate("update"));
 
-        device.emplace(graphicsConfig);
-        update.emplace(device->GetUpdate("update"));
-
-        Babylon::ShaderCache::Enabled(true);
-
-        device->StartRenderingCurrentFrame();
-        update->Start();
+        BeginFrame();
 
         Babylon::AppRuntime::Options options{};
 
         options.EnableDebugger = true;
-
         options.UnhandledExceptionHandler = [hWnd](const Napi::Error& error) {
             std::ostringstream ss{};
             ss << "[Uncaught Error] " << Napi::GetErrorString(error) << std::endl;
@@ -157,73 +121,28 @@ namespace
 
             std::cerr << ss.str();
             std::cerr.flush();
-
-            Babylon::Plugins::TestUtils::errorCode = -1;
             PostMessage(hWnd, WM_CLOSE, 0, 0);
         };
 
         runtime.emplace(options);
-
-        runtime->Dispatch([hWnd](Napi::Env env) {
-            device->AddToJavaScript(env);
-
-            Babylon::Polyfills::Console::Initialize(env, [](const char* message, Babylon::Polyfills::Console::LogLevel logLevel) {
-                std::ostringstream ss{};
-                ss << "[" << GetLogLevelString(logLevel) << "] " << message << std::endl;
-                OutputDebugStringA(ss.str().data());
-
-                std::cout << ss.str();
-                std::cout.flush();
-            });
-
-            Babylon::Polyfills::Window::Initialize(env);
-
-            Babylon::Polyfills::XMLHttpRequest::Initialize(env);
-
-            nativeCanvas.emplace(Babylon::Polyfills::Canvas::Initialize(env));
-
-            Babylon::Plugins::NativeEngine::Initialize(env);
-
-            Babylon::Plugins::NativeOptimizations::Initialize(env);
-
-            Babylon::Plugins::NativeCapture::Initialize(env);
-
-            Babylon::Plugins::NativeCamera::Initialize(env);
-
-            nativeInput = &Babylon::Plugins::NativeInput::CreateForJavaScript(env);
-
-            Babylon::Plugins::TestUtils::Initialize(env, hWnd);
-        });
-
         Babylon::ScriptLoader loader{*runtime};
-        loader.LoadScript("app:///Scripts/ammo.js");
-        // Commenting out recast.js for now because v8jsi is incompatible with asm.js.
-        // loader.LoadScript("app:///Scripts/recast.js");
-        loader.LoadScript("app:///Scripts/babylon.max.js");
-        loader.LoadScript("app:///Scripts/babylonjs.loaders.js");
-        loader.LoadScript("app:///Scripts/babylonjs.materials.js");
-        loader.LoadScript("app:///Scripts/babylon.gui.js");
-        loader.LoadScript("app:///Scripts/meshwriter.min.js");
+        loader.LoadScript("http://127.0.0.1:8080/BabylonInterop.bundle.js");
 
-        std::vector<std::string> scripts = GetCommandLineArguments();
-        if (scripts.empty())
-        {
-            loader.LoadScript("app:///Scripts/experience.js");
-        }
-        else
-        {
-            for (const auto& script : scripts)
-            {
-                loader.LoadScript(GetUrlFromPath(script));
-            }
+        loader.Dispatch([](Napi::Env env) {
+            device->AddToJavaScript(env);
+            ::Babylon::Polyfills::Console::Initialize(env,
+                [](const char* message, auto logLevel) {
+                    std::ostringstream ss{};
+                    ss << "[" << GetLogLevelString(logLevel) << "] " << message << std::endl;
+                    OutputDebugStringA(ss.str().data());
+                    std::cout << ss.str();
+                    std::cout.flush();
+                });
 
-            loader.LoadScript("app:///Scripts/playground_runner.js");
-        }
-    }
-
-    void UpdateWindowSize(size_t width, size_t height)
-    {
-        device->UpdateSize(width, height);
+            ::Babylon::Polyfills::Window::Initialize(env);
+            ::Babylon::Polyfills::XMLHttpRequest::Initialize(env);
+            ::Babylon::Plugins::NativeEngine::Initialize(env);
+        });
     }
 }
 
@@ -337,34 +256,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     UpdateWindow(hWnd);
     EnableMouseInPointer(true);
 
-    RefreshBabylon(hWnd);
+    InitBabylonNative(hWnd);
 
     return TRUE;
-}
-
-void ProcessMouseButtons(tagPOINTER_BUTTON_CHANGE_TYPE changeType, int x, int y)
-{
-    switch (changeType)
-    {
-        case POINTER_CHANGE_FIRSTBUTTON_DOWN:
-            nativeInput->MouseDown(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
-            break;
-        case POINTER_CHANGE_FIRSTBUTTON_UP:
-            nativeInput->MouseUp(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
-            break;
-        case POINTER_CHANGE_SECONDBUTTON_DOWN:
-            nativeInput->MouseDown(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
-            break;
-        case POINTER_CHANGE_SECONDBUTTON_UP:
-            nativeInput->MouseUp(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
-            break;
-        case POINTER_CHANGE_THIRDBUTTON_DOWN:
-            nativeInput->MouseDown(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
-            break;
-        case POINTER_CHANGE_THIRDBUTTON_UP:
-            nativeInput->MouseUp(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
-            break;
-    }
 }
 
 //
@@ -430,112 +324,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
             break;
         }
-        case WM_SIZE:
-        {
-            if (device)
-            {
-                auto width = static_cast<size_t>(LOWORD(lParam));
-                auto height = static_cast<size_t>(HIWORD(lParam));
-                UpdateWindowSize(width, height);
-            }
-            break;
-        }
         case WM_DESTROY:
         {
             Uninitialize();
-            PostQuitMessage(Babylon::Plugins::TestUtils::errorCode);
-            break;
-        }
-        case WM_KEYDOWN:
-        {
-            if (wParam == 'R')
-            {
-                RefreshBabylon(hWnd);
-            }
-            break;
-        }
-        case WM_POINTERWHEEL:
-        {
-            if (nativeInput != nullptr)
-            {
-                nativeInput->MouseWheel(Babylon::Plugins::NativeInput::MOUSEWHEEL_Y_ID, -GET_WHEEL_DELTA_WPARAM(wParam));
-            }
-            break;
-        }
-        case WM_POINTERDOWN:
-        {
-            if (nativeInput != nullptr)
-            {
-                POINTER_INFO info;
-                auto pointerId = GET_POINTERID_WPARAM(wParam);
-                POINT origin{0, 0};
-
-                if (GetPointerInfo(pointerId, &info) && ClientToScreen(hWnd, &origin))
-                {
-                    auto x = GET_X_LPARAM(lParam) - origin.x;
-                    auto y = GET_Y_LPARAM(lParam) - origin.y;
-
-                    if (info.pointerType == PT_MOUSE)
-                    {
-                        ProcessMouseButtons(info.ButtonChangeType, x, y);
-                    }
-                    else
-                    {
-                        nativeInput->TouchDown(pointerId, x, y);
-                    }
-                }
-            }
-            break;
-        }
-        case WM_POINTERUPDATE:
-        {
-            if (nativeInput != nullptr)
-            {
-                auto pointerId = GET_POINTERID_WPARAM(wParam);
-                POINTER_INFO info;
-                POINT origin{0, 0};
-
-                if (GetPointerInfo(pointerId, &info) && ClientToScreen(hWnd, &origin))
-                {
-                    auto x = GET_X_LPARAM(lParam) - origin.x;
-                    auto y = GET_Y_LPARAM(lParam) - origin.y;
-
-                    if (info.pointerType == PT_MOUSE)
-                    {
-                        ProcessMouseButtons(info.ButtonChangeType, x, y);
-                        nativeInput->MouseMove(x, y);
-                    }
-                    else
-                    {
-                        nativeInput->TouchMove(pointerId, x, y);
-                    }
-                }
-            }
-            break;
-        }
-        case WM_POINTERUP:
-        {
-            if (nativeInput != nullptr)
-            {
-                auto pointerId = GET_POINTERID_WPARAM(wParam);
-                POINTER_INFO info;
-                POINT origin{0, 0};
-
-                if (GetPointerInfo(pointerId, &info) && ClientToScreen(hWnd, &origin))
-                {
-                    auto x = GET_X_LPARAM(lParam) - origin.x;
-                    auto y = GET_Y_LPARAM(lParam) - origin.y;
-
-                    if (info.pointerType == PT_MOUSE)
-                    {
-                        ProcessMouseButtons(info.ButtonChangeType, x, y);
-                    }
-                    else
-                    {
-                        nativeInput->TouchUp(pointerId, x, y);
-                    }
-                }
-            }
+            PostQuitMessage(0);
             break;
         }
         default:
