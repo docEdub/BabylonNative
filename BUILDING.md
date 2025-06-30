@@ -260,11 +260,10 @@ the file `Apps\Playground\Android\gradle.properties` and add the following line:
 jsEngine=JavaScriptCore
 ```
 
-Once the npm packages are installed, open the project located at
-`Apps\Playground\Android` with Android Studio. Then in the menu, select `Run` -> `Run 'app'`.
-If you don't have an Android device plugged in or no Android image in the Android emulator,
-that option will be greyed and inaccessible. Instructions and tips on how to install the
-emulator are [available here](Documentation/AndroidEmulator.md).
+Open the project located at `Apps\Playground\Android` with Android Studio. Then in the menu,
+select `Run` -> `Run 'app'`. If you don't have an Android device plugged in or no Android image
+in the Android emulator, that option will be greyed and inaccessible. Instructions and tips
+on how to install the emulator are [available here](Documentation/AndroidEmulator.md).
 
 ## **Building on Ubuntu, Targeting Linux**
 
@@ -290,13 +289,13 @@ Depending on the JavaScript engine you want to use, you will have to install the
 Install the following package:
 
 ```
-sudo apt-get install libjavascriptcoregtk-4.0-dev
+sudo apt-get install libjavascriptcoregtk-4.1-dev
 ```
 
 Then, run cmake targetting a Ninja make file:
 
 ```
-cmake -G Ninja -D JAVASCRIPTCORE_LIBRARY=/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so -D NAPI_JAVASCRIPT_ENGINE=JavaScriptCore
+cmake -G Ninja -D JAVASCRIPTCORE_LIBRARY=/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so -D NAPI_JAVASCRIPT_ENGINE=JavaScriptCore
 ```
 
 ### V8

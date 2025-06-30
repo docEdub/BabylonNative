@@ -25,6 +25,10 @@
 #include <Babylon/ShaderCache.h>
 #include "ShaderCache.h"
 
+#ifdef WEBP
+#include <webp/decode.h>
+#endif
+
 namespace Babylon
 {
     namespace
@@ -186,6 +190,19 @@ namespace Babylon
             bimg::ImageContainer* image{bimg::imageParse(&allocator, data.data(), static_cast<uint32_t>(data.size()))};
             if (image == nullptr)
             {
+#ifdef WEBP
+                int width;
+                int height;
+                if (WebPGetInfo(data.data(), data.size(), &width, &height))
+                {
+                    image = bimg::imageAlloc(&allocator, bimg::TextureFormat::RGBA8, static_cast<uint16_t>(width), static_cast<uint16_t>(height), 1, 1, false, false);
+                    if (WebPDecodeRGBAInto(data.data(), data.size(), static_cast<uint8_t*>(image->m_data), static_cast<size_t>(image->m_size), width * 4))
+                    {
+                        return image;
+                    }
+                }
+#endif
+
                 throw std::runtime_error{"Failed to parse image."};
             }
 
@@ -418,7 +435,7 @@ namespace Babylon
             JS_CLASS_NAME,
             {
                 // This must match the version in nativeEngine.ts
-                StaticValue("PROTOCOL_VERSION", Napi::Number::From(env, 8)),
+                StaticValue("PROTOCOL_VERSION", Napi::Number::From(env, 9)),
 
                 StaticValue("CAPS_LIMITS_MAX_TEXTURE_SIZE", Napi::Number::From(env, limits.maxTextureSize)),
                 StaticValue("CAPS_LIMITS_MAX_TEXTURE_LAYERS", Napi::Number::From(env, limits.maxTextureLayers)),
@@ -653,6 +670,7 @@ namespace Babylon
                 StaticValue("COMMAND_SETSTENCIL", Napi::FunctionPointer::Create(env, &NativeEngine::SetStencil)),
                 StaticValue("COMMAND_SETVIEWPORT", Napi::FunctionPointer::Create(env, &NativeEngine::SetViewPort)),
                 StaticValue("COMMAND_SETSCISSOR", Napi::FunctionPointer::Create(env, &NativeEngine::SetScissor)),
+                StaticValue("COMMAND_COPYTEXTURE", Napi::FunctionPointer::Create(env, &NativeEngine::CopyTexture)),
 
                 InstanceMethod("dispose", &NativeEngine::Dispose),
 
@@ -682,7 +700,6 @@ namespace Babylon
                 InstanceMethod("loadCubeTextureWithMips", &NativeEngine::LoadCubeTextureWithMips),
                 InstanceMethod("getTextureWidth", &NativeEngine::GetTextureWidth),
                 InstanceMethod("getTextureHeight", &NativeEngine::GetTextureHeight),
-                InstanceMethod("copyTexture", &NativeEngine::CopyTexture),
                 InstanceMethod("deleteTexture", &NativeEngine::DeleteTexture),
                 InstanceMethod("readTexture", &NativeEngine::ReadTexture),
 
@@ -1103,7 +1120,7 @@ namespace Babylon
             uniforms[index] = info.Env().Null();
         }
 
-        return std::move(uniforms);
+        return uniforms;
     }
 
     Napi::Value NativeEngine::GetAttributes(const Napi::CallbackInfo& info)
@@ -1123,7 +1140,7 @@ namespace Babylon
             attributes[index] = Napi::Value::From(info.Env(), location);
         }
 
-        return std::move(attributes);
+        return attributes;
     }
 
     void NativeEngine::SetProgram(NativeDataStream::Reader& data)
@@ -1427,22 +1444,14 @@ namespace Babylon
             });
     }
 
-    void NativeEngine::CopyTexture(const Napi::CallbackInfo& info)
+    void NativeEngine::CopyTexture(NativeDataStream::Reader& data)
     {
-        const auto textureDestination = info[0].As<Napi::Pointer<Graphics::Texture>>().Get();
-        const auto textureSource = info[1].As<Napi::Pointer<Graphics::Texture>>().Get();
+        bgfx::Encoder* encoder = GetUpdateToken().GetEncoder();
 
-        arcana::make_task(m_update.Scheduler(), *m_cancellationSource, [this, textureDestination, textureSource, cancellationSource = m_cancellationSource]() {
-            return arcana::make_task(m_runtimeScheduler, *m_cancellationSource, [this, textureDestination, textureSource, updateToken = m_update.GetUpdateToken(), cancellationSource = m_cancellationSource]() {
-                bgfx::Encoder* encoder = m_update.GetUpdateToken().GetEncoder();
-                GetBoundFrameBuffer(*encoder).Blit(*encoder, textureDestination->Handle(), 0, 0, textureSource->Handle());
-            }).then(arcana::inline_scheduler, *m_cancellationSource, [this, cancellationSource{m_cancellationSource}](const arcana::expected<void, std::exception_ptr>& result) {
-                if (!cancellationSource->cancelled() && result.has_error())
-                {
-                    Napi::Error::New(Env(), result.error()).ThrowAsJavaScriptException();
-                }
-            });
-        });
+        const auto textureSource = data.ReadPointer<Graphics::Texture>();
+        const auto textureDestination = data.ReadPointer<Graphics::Texture>();
+
+        GetBoundFrameBuffer(*encoder).Blit(*encoder, textureDestination->Handle(), 0, 0, textureSource->Handle());
     }
 
     void NativeEngine::LoadRawTexture(const Napi::CallbackInfo& info)
@@ -2111,7 +2120,7 @@ namespace Babylon
             bimg::imageFree(image);
         }
 
-        return std::move(imageBitmap);
+        return imageBitmap;
     }
 
     Napi::Value NativeEngine::ResizeImageBitmap(const Napi::CallbackInfo& info)
