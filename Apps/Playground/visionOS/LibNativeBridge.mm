@@ -9,6 +9,8 @@
 #import <Babylon/Polyfills/Console.h>
 #import <Babylon/Polyfills/Window.h>
 #import <Babylon/Polyfills/XMLHttpRequest.h>
+#import <Metal/Metal.h>
+#import <simd/simd.h>
 
 @implementation LibNativeBridge {
   std::optional<Babylon::Graphics::Device> _device;
@@ -18,6 +20,13 @@
   Babylon::Plugins::NativeInput* _nativeInput;
   bool _isXrActive;
   CADisplayLink *_displayLink;
+  
+  // Immersive mode properties
+  cp_layer_renderer_t _layerRenderer;
+  cp_frame_t _frame;
+  cp_drawable_t _drawable;
+  NSInteger _viewportWidth;
+  NSInteger _viewportHeight;
 }
 
 + (instancetype)sharedInstance {
@@ -38,7 +47,9 @@
     [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSDefaultRunLoopMode];
     
     Babylon::Graphics::Configuration graphicsConfig{};
-    graphicsConfig.Window = self.metalLayer;
+    if (self.metalLayer) {
+        graphicsConfig.Window = self.metalLayer;
+    }
     graphicsConfig.Width = static_cast<size_t>(width);
     graphicsConfig.Height = static_cast<size_t>(height);
 
@@ -143,6 +154,108 @@
 
 - (void)dealloc {
     [self shutdown];
+}
+
+#pragma mark - Immersive Mode Support
+
+- (void)initializeImmersiveWithLayerRenderer:(cp_layer_renderer_t)layerRenderer {
+    _layerRenderer = layerRenderer;
+    self.immersive = YES;
+    
+    // Get layer configuration
+    cp_layer_renderer_configuration_t config = cp_layer_renderer_get_configuration(_layerRenderer);
+    cp_layer_renderer_layout layout = cp_layer_renderer_configuration_get_layout(config);
+    
+    // Initialize viewport dimensions based on layout
+    if (layout == cp_layer_renderer_layout_shared) {
+        _viewportWidth = 2048;
+        _viewportHeight = 2048;
+    } else {
+        // For stereo/viewpoint layouts
+        _viewportWidth = 1024;
+        _viewportHeight = 1024;
+    }
+    
+    // Initialize Babylon if not already initialized
+    if (!self.initialized) {
+        // Initialize without a metal layer for immersive mode
+        [self initializeWithWidth:_viewportWidth height:_viewportHeight];
+    }
+    
+    // Stop regular display link if running
+    if (_displayLink) {
+        [_displayLink invalidate];
+        _displayLink = nil;
+    }
+    
+    // Start render loop for immersive mode
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self startImmersiveRenderLoop];
+    });
+}
+
+- (void)startImmersiveRenderLoop {
+    if (!self.immersive || !_layerRenderer) {
+        return;
+    }
+    
+    @autoreleasepool {
+        [self renderImmersive];
+    }
+    
+    // Schedule next frame
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self startImmersiveRenderLoop];
+    });
+}
+
+- (void)renderImmersive {
+    if (!_layerRenderer || !self.initialized || !_device) {
+        return;
+    }
+    
+    // Wait for new frame timing
+    _frame = cp_layer_renderer_query_next_frame(_layerRenderer);
+    if (_frame == nil) {
+        return;
+    }
+    
+    // Get frame timing
+    cp_frame_timing_t timing = cp_frame_get_timing(_frame);
+    cp_time_t displayTime = cp_frame_timing_get_presentation_time(timing);
+    
+    // Wait for optimal render time
+    cp_frame_timing_wait_until_optimal_input_time(timing);
+    
+    // Start frame submission
+    cp_frame_start_submission(_frame);
+    
+    // Get drawable
+    _drawable = cp_frame_query_drawable(_frame);
+    if (_drawable == nil) {
+        cp_frame_end_submission(_frame);
+        return;
+    }
+    
+    // For now, render the same content to all views
+    // In a full implementation, we would update camera matrices per view
+    if (_device && _update) {
+        _update->Finish();
+        _device->FinishRenderingCurrentFrame();
+        _device->StartRenderingCurrentFrame();
+        _update->Start();
+    }
+    
+    // Present the drawable
+    cp_drawable_encode(_drawable);
+    
+    // End frame submission
+    cp_frame_end_submission(_frame);
+}
+
+- (void)processSpatialEvents:(ar_data_providers_t)dataProviders {
+    // Process hand tracking or other spatial input events
+    // This would integrate with NativeInput for spatial interactions
 }
 
 @end

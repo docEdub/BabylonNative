@@ -4,7 +4,7 @@
 /// <reference path="../../node_modules/babylonjs-gui/babylon.gui.module.d.ts" />
 
 const wireframe = false;
-const turntable = false;
+const turntable = true;
 const logfps = true;
 const ibl = false;
 const rtt = false;
@@ -21,7 +21,36 @@ const imageTracking = false;
 const readPixels = false;
 
 function CreateBoxAsync(scene) {
-    BABYLON.Mesh.CreateBox("box1", 0.2, scene);
+    // Create a more interesting scene for immersive viewing
+    const box = BABYLON.Mesh.CreateBox("box1", 0.5, scene);
+    box.position = new BABYLON.Vector3(0, 0, 2);
+    
+    // Add material with color
+    const material = new BABYLON.StandardMaterial("boxMaterial", scene);
+    material.diffuseColor = new BABYLON.Color3(0.5, 0.7, 1);
+    material.specularColor = new BABYLON.Color3(0, 0, 0);
+    box.material = material;
+    
+    // Create additional objects around the user
+    const sphere1 = BABYLON.Mesh.CreateSphere("sphere1", 32, 0.3, scene);
+    sphere1.position = new BABYLON.Vector3(-1, 0.5, 1.5);
+    const sphereMat1 = new BABYLON.StandardMaterial("sphereMat1", scene);
+    sphereMat1.diffuseColor = new BABYLON.Color3(1, 0.5, 0.5);
+    sphere1.material = sphereMat1;
+    
+    const sphere2 = BABYLON.Mesh.CreateSphere("sphere2", 32, 0.3, scene);
+    sphere2.position = new BABYLON.Vector3(1, 0.5, 1.5);
+    const sphereMat2 = new BABYLON.StandardMaterial("sphereMat2", scene);
+    sphereMat2.diffuseColor = new BABYLON.Color3(0.5, 1, 0.5);
+    sphere2.material = sphereMat2;
+    
+    // Create a ground plane
+    const ground = BABYLON.Mesh.CreateGround("ground", 6, 6, 2, scene);
+    ground.position.y = -0.5;
+    const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
+    groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+    ground.material = groundMat;
+    
     return Promise.resolve();
 }
 

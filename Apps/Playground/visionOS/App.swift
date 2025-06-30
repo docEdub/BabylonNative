@@ -1,4 +1,20 @@
 import SwiftUI
+import CompositorServices
+import simd
+
+struct BabylonLayerConfiguration: CompositorLayerConfiguration {
+  func makeConfiguration(capabilities: LayerRenderer.Capabilities, configuration: inout LayerRenderer.Configuration) {
+    configuration.depthFormat = .depth32Float
+    configuration.colorFormat = .bgra8Unorm_srgb
+    
+    let options = LayerRenderer.Capabilities.SupportedLayoutsOptions(
+      maxCapacity: 5000,
+      configuration: .viewpoints
+    )
+    
+    configuration.layout = capabilities.supportedLayouts(options: options).first ?? .shared
+  }
+}
 
 class MetalView: UIView {
   override init(frame: CGRect) {
@@ -65,13 +81,54 @@ struct MetalViewRepresentable: UIViewRepresentable {
   func updateUIView(_ uiView: MetalView, context: Context) {}
 }
 
+struct ContentView: View {
+  @Environment(\.openImmersiveSpace) var openImmersiveSpace
+  @Environment(\.dismissImmersiveSpace) var dismissImmersiveSpace
+  @State private var isShowingImmersive = false
+  
+  var body: some View {
+    VStack {
+      MetalViewRepresentable()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      
+      HStack {
+        Button(isShowingImmersive ? "Exit Immersive" : "Enter Immersive") {
+          Task {
+            if isShowingImmersive {
+              await dismissImmersiveSpace()
+              isShowingImmersive = false
+            } else {
+              await openImmersiveSpace(id: "ImmersiveSpace")
+              isShowingImmersive = true
+            }
+          }
+        }
+        .padding()
+      }
+    }
+  }
+}
+
 
 @main
 struct ExampleApp: App {
+  @State private var currentStyle: ImmersionStyle = .full
+  
   var body: some Scene {
     WindowGroup {
-      MetalViewRepresentable()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      ContentView()
     }
+    
+    ImmersiveSpace(id: "ImmersiveSpace") {
+      CompositorLayer(configuration: BabylonLayerConfiguration()) { layerRenderer in
+        let bridge = LibNativeBridge.sharedInstance()
+        bridge?.initializeImmersive(with: layerRenderer)
+        
+        layerRenderer.onSpatialEvent = { eventCollection in
+          bridge?.processSpatialEvents(eventCollection)
+        }
+      }
+    }
+    .immersionStyle(selection: $currentStyle, in: .full)
   }
 }
