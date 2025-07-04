@@ -14,6 +14,12 @@ namespace Babylon::Graphics
 
     float DeviceImpl::GetDevicePixelRatio(WindowT window)
     {
+#if TARGET_OS_VISION
+        // On visionOS, the screen property is not available, so return a default scale factor
+        (void)window; // Suppress unused parameter warning
+        return 2.0f; // Common scale factor for high-resolution displays
+#else
         return window.window.screen.backingScaleFactor;
+#endif
     }
 }

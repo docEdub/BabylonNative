@@ -1,5 +1,36 @@
 #pragma once
 
+#include <napi/napi.h>
+#include <XR.h>
+#include <Babylon/JsRuntimeScheduler.h>
+#include <arcana/threading/task.h>
+
+// Forward declarations for XR classes
+namespace xr
+{
+    class System;
+    class Session;
+    class Frame;
+    class Anchor;
+}
+
+namespace Babylon
+{
+    namespace Plugins
+    {
+        namespace NativeXr
+        {
+            class Impl;
+        }
+        
+        class XRSession;
+    }
+}
+
+// Forward declarations
+class NativeWebXRRenderTarget;
+class NativeRenderTargetProvider;
+
 namespace Babylon
 {
     namespace

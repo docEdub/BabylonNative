@@ -54,7 +54,7 @@ if(APPLE)
         set(PLIST_FILE "${CMAKE_CURRENT_LIST_DIR}/macOS/Info.plist")
         set(STORYBOARD "${CMAKE_CURRENT_LIST_DIR}/macOS/Base.lproj/Main.storyboard")
         set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE NativeCamera)
-        set(RESOURCE_FILES ${STORYBOARD})
+        set(RESOURCE_FILES ${STORYBOARD} ${SCRIPTS})
         set(SOURCES
             ${SOURCES}
             "macOS/main.m"
@@ -66,7 +66,6 @@ if(APPLE)
         set_source_files_properties(${REFERENCE_IMAGES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/ReferenceImages")
     endif()
     set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE ${JAVASCRIPTCORE_LIBRARY})
-    set(RESOURCE_FILES ${STORYBOARD})
 
     # Remove -Wall and -Werror from the debug flags to make simulators work.
     string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")

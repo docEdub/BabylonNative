@@ -4,6 +4,12 @@ else()
     set(PLATFORM ${BABYLON_NATIVE_PLATFORM})
 endif()
 
+# Skip NativeCamera for visionOS - AVFoundation APIs not available
+if(APPLE AND CMAKE_SYSTEM_NAME MATCHES "visionOS")
+    message(STATUS "Skipping NativeCamera for visionOS - AVFoundation camera APIs not available")
+    return()
+endif()
+
 set(SOURCES
     "Include/Babylon/Plugins/NativeCamera.h"
     "Source/Capability.h"

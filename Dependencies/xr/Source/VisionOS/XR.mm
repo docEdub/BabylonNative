@@ -2,14 +2,16 @@
 #error "ARC is off"
 #endif
 
-#import <XR.h>
-#import <XRHelpers.h>
+#include "../../Include/XR.h"
+#include "../../Include/XRHelpers.h"
 
 #import <UIKit/UIKit.h>
 #import <CompositorServices/CompositorServices.h>
 #import <MetalKit/MetalKit.h>
+#import <Foundation/Foundation.h>
+#include <stdexcept>
 
-#import "Include/IXrContextVisionOS.h"
+#include "Include/IXrContextVisionOS.h"
 
 namespace {
     typedef struct {
@@ -135,6 +137,11 @@ namespace xr {
         void SetImmersiveSessionActive(bool active) override
         {
             ImmersiveSession = active;
+            if (active) {
+                StartImmersiveSession();
+            } else {
+                StopImmersiveSession();
+            }
         }
 
         void* GetCompositorLayer() const override
@@ -145,6 +152,18 @@ namespace xr {
         void SetCompositorLayer(void* layer) override
         {
             CompositorLayer = layer;
+        }
+
+        void StartImmersiveSession() {
+            NSLog(@"Starting immersive session");
+            // Post notification to Swift app to hide main window
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"immersiveModeChanged" object:@YES];
+        }
+
+        void StopImmersiveSession() {
+            NSLog(@"Stopping immersive session");
+            // Post notification to Swift app to show main window
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"immersiveModeChanged" object:@NO];
         }
 
         virtual ~XrContextVisionOS() = default;
