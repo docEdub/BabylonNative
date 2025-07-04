@@ -1,9 +1,11 @@
 import SwiftUI
+import CompositorServices
 
 class MetalView: UIView {
   override init(frame: CGRect) {
     super.init(frame: frame)
-    self.backgroundColor = .clear
+    // Set bright purple background to verify it's hidden in immersive mode
+    self.backgroundColor = .systemPurple
   }
   
   required init?(coder: NSCoder) {
@@ -27,7 +29,7 @@ class MetalView: UIView {
     )
     metalLayer.pixelFormat = .bgra8Unorm
     metalLayer.framebufferOnly = true
-    
+
     bridge.metalLayer = self.metalLayer
     
     let scale = UITraitCollection.current.displayScale
@@ -68,10 +70,23 @@ struct MetalViewRepresentable: UIViewRepresentable {
 
 @main
 struct ExampleApp: App {
+  @State private var showImmersiveView = false
+  
   var body: some Scene {
     WindowGroup {
       MetalViewRepresentable()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .windowStyle(.plain)
+    
+    ImmersiveSpace(id: "ImmersiveSpace") {
+      // For now, simple immersive space that uses the same rendering
+      MetalViewRepresentable()
+        .onAppear {
+          // Hide the main window when entering immersive mode
+          // The purple border should not be visible in immersive mode
+        }
+    }
+    .immersionStyle(selection: .constant(.full), in: .full)
   }
 }

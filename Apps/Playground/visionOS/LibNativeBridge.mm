@@ -5,6 +5,7 @@
 #import <Babylon/Plugins/NativeEngine.h>
 #import <Babylon/Plugins/NativeInput.h>
 #import <Babylon/Plugins/NativeOptimizations.h>
+#import <Babylon/Plugins/NativeXr.h>
 #import <Babylon/Polyfills/Canvas.h>
 #import <Babylon/Polyfills/Console.h>
 #import <Babylon/Polyfills/Window.h>
@@ -15,6 +16,7 @@
   std::optional<Babylon::Graphics::DeviceUpdate> _update;
   std::optional<Babylon::AppRuntime> _runtime;
   std::optional<Babylon::Polyfills::Canvas> _nativeCanvas;
+  std::optional<Babylon::Plugins::NativeXr> _nativeXr;
   Babylon::Plugins::NativeInput* _nativeInput;
   bool _isXrActive;
   CADisplayLink *_displayLink;
@@ -27,6 +29,10 @@
     sharedInstance = [[self alloc] init];
   });
   return sharedInstance;
+}
+
+- (BOOL)isXrActive {
+    return _isXrActive;
 }
 
 - (bool)initializeWithWidth:(NSInteger)width height:(NSInteger)height {
@@ -66,6 +72,12 @@
         Babylon::Plugins::NativeEngine::Initialize(env);
 
         Babylon::Plugins::NativeOptimizations::Initialize(env);
+        
+        self->_nativeXr.emplace(Babylon::Plugins::NativeXr::Initialize(env));
+        self->_nativeXr->UpdateWindow((__bridge void*)self.metalLayer);
+        self->_nativeXr->SetSessionStateChangedCallback([self](bool isSessionActive) {
+            self->_isXrActive = isSessionActive;
+        });
      
         _nativeInput = &Babylon::Plugins::NativeInput::CreateForJavaScript(env);
     });
@@ -132,6 +144,7 @@
     }
 
     _nativeInput = nullptr;
+    _nativeXr.reset();
     _nativeCanvas.reset();
     _runtime.reset();
     _update.reset();

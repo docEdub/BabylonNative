@@ -99,6 +99,11 @@ option(BABYLON_NATIVE_POLYFILL_CANVAS "Include Babylon Native Polyfill Canvas." 
 
 # --------------------------------------------------
 
+# Set platform detection variables
+if(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    set(VISIONOS TRUE)
+endif()
+
 if(ANDROID)
     set(BABYLON_NATIVE_PLATFORM "Android")
 elseif(IOS)

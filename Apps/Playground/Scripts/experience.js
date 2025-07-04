@@ -8,7 +8,7 @@ const turntable = false;
 const logfps = true;
 const ibl = false;
 const rtt = false;
-const vr = false;
+const vr = true;  // Enable VR for visionOS testing
 const ar = false;
 const xrHitTest = false;
 const xrFeaturePoints = false;
@@ -22,6 +22,16 @@ const readPixels = false;
 
 function CreateBoxAsync(scene) {
     BABYLON.Mesh.CreateBox("box1", 0.2, scene);
+    
+    // Add green sphere for visionOS immersive mode testing
+    const greenSphere = BABYLON.Mesh.CreateSphere("greenSphere", 16, 0.5, scene);
+    greenSphere.position.set(0, 0, 0);  // Center of the scene
+    
+    const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
+    greenMaterial.diffuseColor = BABYLON.Color3.Green();
+    greenMaterial.emissiveColor = new BABYLON.Color3(0.2, 0.5, 0.2);  // Make it glow slightly
+    greenSphere.material = greenMaterial;
+    
     return Promise.resolve();
 }
 

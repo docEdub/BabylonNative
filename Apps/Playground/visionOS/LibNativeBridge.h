@@ -7,6 +7,7 @@
 
 @property (nonatomic, assign, getter=isInitialized) BOOL initialized;
 @property (nonatomic, strong) CAMetalLayer *metalLayer;
+@property (nonatomic, assign, readonly) BOOL isXrActive;
 
 + (instancetype)sharedInstance;
 

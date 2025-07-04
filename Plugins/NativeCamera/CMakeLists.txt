@@ -1,4 +1,6 @@
-if(APPLE)
+if(VISIONOS)
+    set(PLATFORM VisionOS)
+elseif(APPLE)
     set(PLATFORM Apple)
 else()
     set(PLATFORM ${BABYLON_NATIVE_PLATFORM})

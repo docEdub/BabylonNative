@@ -41,6 +41,8 @@ if(APPLE)
         set(PLIST_FILE
             "${CMAKE_CURRENT_LIST_DIR}/visionOS/Info.plist")
         set(RESOURCE_FILES ${SCRIPTS})
+        set(ADDITIONAL_LIBRARIES PRIVATE NativeXr)
+        set(DEPLOYMENT_TARGET "1.0")
         set(SOURCES
             ${SOURCES}
             "visionOS/App.swift"
@@ -204,6 +206,9 @@ if(APPLE)
         set(CMAKE_Swift_COMPILER_FORCED TRUE)
         set(CMAKE_Swift_LANGUAGE_VERSION 5.0)
         enable_language(Swift)
+        
+        # Link CompositorServices framework for immersive mode
+        target_link_libraries(Playground PUBLIC "-framework CompositorServices")
     else()
         target_link_libraries(Playground PUBLIC "-framework MetalKit")
 
