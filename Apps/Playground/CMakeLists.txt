@@ -41,6 +41,7 @@ if(APPLE)
         set(PLIST_FILE
             "${CMAKE_CURRENT_LIST_DIR}/visionOS/Info.plist")
         set(RESOURCE_FILES ${SCRIPTS})
+        set(ADDITIONAL_LIBRARIES PRIVATE z NativeXr)
         set(SOURCES
             ${SOURCES}
             "visionOS/App.swift"

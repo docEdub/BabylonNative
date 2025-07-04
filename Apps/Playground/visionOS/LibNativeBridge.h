@@ -7,6 +7,7 @@
 
 @property (nonatomic, assign, getter=isInitialized) BOOL initialized;
 @property (nonatomic, strong) CAMetalLayer *metalLayer;
+@property (nonatomic, assign, getter=isImmersiveSessionActive) BOOL immersiveSessionActive;
 
 + (instancetype)sharedInstance;
 
@@ -19,6 +20,9 @@
 - (bool)initializeWithWidth:(NSInteger)width height:(NSInteger)height;
 - (void)shutdown;
 - (void)render;
+
+- (void)enterImmersiveMode;
+- (void)exitImmersiveMode;
 
 @end
 

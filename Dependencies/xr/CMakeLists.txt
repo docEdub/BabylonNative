@@ -37,6 +37,10 @@ elseif (IOS)
     set(SOURCES ${SOURCES}
         "Source/ARKit/Include/IXrContextARKit.h"
         "Source/ARKit/XR.mm")
+elseif (VISIONOS)
+    set(SOURCES ${SOURCES}
+        "Source/VisionOS/Include/IXrContextVisionOS.h"
+        "Source/VisionOS/XR.mm")
 endif()
 
 add_library(xr ${SOURCES})
@@ -63,6 +67,8 @@ if (ANDROID)
     target_link_libraries(xr PRIVATE glm arcore AndroidExtensions)
 elseif (IOS)    
     target_link_libraries(xr PRIVATE "-framework ARKit")
+elseif (VISIONOS)
+    target_link_libraries(xr PRIVATE "-framework CompositorServices")
 endif()
 
 target_link_libraries(xr

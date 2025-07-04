@@ -8,7 +8,7 @@ const turntable = false;
 const logfps = true;
 const ibl = false;
 const rtt = false;
-const vr = false;
+const vr = true;
 const ar = false;
 const xrHitTest = false;
 const xrFeaturePoints = false;
@@ -22,6 +22,19 @@ const readPixels = false;
 
 function CreateBoxAsync(scene) {
     BABYLON.Mesh.CreateBox("box1", 0.2, scene);
+    
+    // Create a green sphere in the center for WebXR immersive-vr testing
+    const greenSphere = BABYLON.Mesh.CreateSphere("greenTestSphere", 32, 0.5, scene);
+    greenSphere.position.x = 0;
+    greenSphere.position.y = 0;
+    greenSphere.position.z = 0;
+    
+    // Create green material for the sphere
+    const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
+    greenMaterial.diffuseColor = new BABYLON.Color3(0, 1, 0); // Bright green
+    greenMaterial.emissiveColor = new BABYLON.Color3(0, 0.2, 0); // Slightly emissive
+    greenSphere.material = greenMaterial;
+    
     return Promise.resolve();
 }
 

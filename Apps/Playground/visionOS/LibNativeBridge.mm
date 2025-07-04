@@ -5,16 +5,19 @@
 #import <Babylon/Plugins/NativeEngine.h>
 #import <Babylon/Plugins/NativeInput.h>
 #import <Babylon/Plugins/NativeOptimizations.h>
+#import <Babylon/Plugins/NativeXr.h>
 #import <Babylon/Polyfills/Canvas.h>
 #import <Babylon/Polyfills/Console.h>
 #import <Babylon/Polyfills/Window.h>
 #import <Babylon/Polyfills/XMLHttpRequest.h>
+#import <Babylon/DebugTrace.h>
 
 @implementation LibNativeBridge {
   std::optional<Babylon::Graphics::Device> _device;
   std::optional<Babylon::Graphics::DeviceUpdate> _update;
   std::optional<Babylon::AppRuntime> _runtime;
   std::optional<Babylon::Polyfills::Canvas> _nativeCanvas;
+  std::optional<Babylon::Plugins::NativeXr> _nativeXr;
   Babylon::Plugins::NativeInput* _nativeInput;
   bool _isXrActive;
   CADisplayLink *_displayLink;
@@ -33,6 +36,9 @@
     if (self.initialized) {
         return YES;
     }
+  
+    Babylon::DebugTrace::EnableDebugTrace(true);
+    Babylon::DebugTrace::SetTraceOutput([](const char* trace) { NSLog(@"%s", trace); });
   
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(render)];
     [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSDefaultRunLoopMode];
@@ -66,7 +72,13 @@
         Babylon::Plugins::NativeEngine::Initialize(env);
 
         Babylon::Plugins::NativeOptimizations::Initialize(env);
-     
+
+        self->_nativeXr.emplace(Babylon::Plugins::NativeXr::Initialize(env));
+        self->_nativeXr->SetSessionStateChangedCallback([self](bool isXrActive) {
+            self->_isXrActive = isXrActive;
+            self.immersiveSessionActive = isXrActive;
+        });
+        
         _nativeInput = &Babylon::Plugins::NativeInput::CreateForJavaScript(env);
     });
 
@@ -132,6 +144,7 @@
     }
 
     _nativeInput = nullptr;
+    _nativeXr.reset();
     _nativeCanvas.reset();
     _runtime.reset();
     _update.reset();
@@ -139,6 +152,20 @@
     [_displayLink invalidate];
     _displayLink = NULL;
     self.initialized = NO;
+}
+
+- (void)enterImmersiveMode {
+    // Implementation for entering immersive mode
+    // This will be called when WebXR immersive session starts
+    self.immersiveSessionActive = YES;
+    NSLog(@"Entering immersive mode");
+}
+
+- (void)exitImmersiveMode {
+    // Implementation for exiting immersive mode
+    // This will be called when WebXR immersive session ends
+    self.immersiveSessionActive = NO;
+    NSLog(@"Exiting immersive mode");
 }
 
 - (void)dealloc {
