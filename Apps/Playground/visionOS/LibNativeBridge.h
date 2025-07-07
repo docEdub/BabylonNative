@@ -7,6 +7,7 @@
 
 @property (nonatomic, assign, getter=isInitialized) BOOL initialized;
 @property (nonatomic, strong) CAMetalLayer *metalLayer;
+@property (nonatomic, assign) cp_layer_renderer_t layerRenderer;
 
 + (instancetype)sharedInstance;
 
@@ -19,6 +20,10 @@
 - (bool)initializeWithWidth:(NSInteger)width height:(NSInteger)height;
 - (void)shutdown;
 - (void)render;
+
+// Immersive mode support
+- (void)setupImmersiveModeWithLayerRenderer:(cp_layer_renderer_t)layerRenderer;
+- (void)renderImmersiveFrame;
 
 @end
 

@@ -45,6 +45,13 @@ const engine = new BABYLON.NativeEngine();
 const scene = new BABYLON.Scene(engine);
 
 CreateBoxAsync(scene).then(function () {
+    // Create a green sphere in the center for visionOS immersive-vr testing
+    const greenSphere = BABYLON.Mesh.CreateSphere("greenSphere", 32, 0.5, scene);
+    greenSphere.position = new BABYLON.Vector3(0, 0, 2);
+    const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
+    greenMaterial.diffuseColor = BABYLON.Color3.Green();
+    greenSphere.material = greenMaterial;
+    
 //CreateSpheresAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF/Box.gltf").then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxTextured/glTF/BoxTextured.gltf").then(function () {

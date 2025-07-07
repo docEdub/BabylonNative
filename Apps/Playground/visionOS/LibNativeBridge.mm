@@ -5,6 +5,7 @@
 #import <Babylon/Plugins/NativeEngine.h>
 #import <Babylon/Plugins/NativeInput.h>
 #import <Babylon/Plugins/NativeOptimizations.h>
+// #import <Babylon/Plugins/NativeXr.h>  // TODO: Enable when XR is properly built for visionOS
 #import <Babylon/Polyfills/Canvas.h>
 #import <Babylon/Polyfills/Console.h>
 #import <Babylon/Polyfills/Window.h>
@@ -16,6 +17,7 @@
   std::optional<Babylon::AppRuntime> _runtime;
   std::optional<Babylon::Polyfills::Canvas> _nativeCanvas;
   Babylon::Plugins::NativeInput* _nativeInput;
+  // std::optional<Babylon::Plugins::NativeXr> _nativeXr;  // TODO: Enable when XR is properly built for visionOS
   bool _isXrActive;
   CADisplayLink *_displayLink;
 }
@@ -66,7 +68,9 @@
         Babylon::Plugins::NativeEngine::Initialize(env);
 
         Babylon::Plugins::NativeOptimizations::Initialize(env);
-     
+        
+        // _nativeXr.emplace(Babylon::Plugins::NativeXr::Initialize(env));  // TODO: Enable when XR is properly built for visionOS
+        
         _nativeInput = &Babylon::Plugins::NativeInput::CreateForJavaScript(env);
     });
 
@@ -139,6 +143,28 @@
     [_displayLink invalidate];
     _displayLink = NULL;
     self.initialized = NO;
+}
+
+- (void)setupImmersiveModeWithLayerRenderer:(cp_layer_renderer_t)layerRenderer {
+    self.layerRenderer = layerRenderer;
+    _isXrActive = YES;
+    
+    // TODO: Enable when XR is properly built for visionOS
+    // if (_nativeXr) {
+    //     _nativeXr->UpdateWindow((__bridge void*)layerRenderer);
+    //     _nativeXr->SetSessionStateChangedCallback([self](bool isSessionActive) {
+    //         _isXrActive = isSessionActive;
+    //     });
+    // }
+}
+
+- (void)renderImmersiveFrame {
+    if (_device && self.initialized && _isXrActive) {
+        _update->Finish();
+        _device->FinishRenderingCurrentFrame();
+        _device->StartRenderingCurrentFrame();
+        _update->Start();
+    }
 }
 
 - (void)dealloc {

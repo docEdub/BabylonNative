@@ -33,10 +33,14 @@ if (ANDROID)
     set(SOURCES ${SOURCES}
         "Source/ARCore/Include/IXrContextARCore.h"
         "Source/ARCore/XR.cpp")
-elseif (IOS)
+elseif (IOS AND NOT VISIONOS)
     set(SOURCES ${SOURCES}
         "Source/ARKit/Include/IXrContextARKit.h"
         "Source/ARKit/XR.mm")
+elseif (VISIONOS)
+    set(SOURCES ${SOURCES}
+        "Source/visionOS/Include/IXrContextvisionOS.h"
+        "Source/visionOS/XR.mm")
 endif()
 
 add_library(xr ${SOURCES})
@@ -61,8 +65,10 @@ if (ANDROID)
     set_target_properties(glm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${arcore-android-sdk_SOURCE_DIR}/libraries/glm)
 
     target_link_libraries(xr PRIVATE glm arcore AndroidExtensions)
-elseif (IOS)    
+elseif (IOS AND NOT VISIONOS)    
     target_link_libraries(xr PRIVATE "-framework ARKit")
+elseif (VISIONOS)
+    target_link_libraries(xr PRIVATE "-framework CompositorServices")
 endif()
 
 target_link_libraries(xr

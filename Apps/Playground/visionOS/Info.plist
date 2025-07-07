@@ -29,5 +29,13 @@
 	<key>UISceneConfigurations</key>
 	<dict/>
 	</dict>
+	<key>NSPrefersNonVolumetricUI</key>
+	<false/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UIRequiresFullScreen</key>
+	<false/>
 </dict>
 </plist>
