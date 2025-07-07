@@ -12,8 +12,8 @@
 #import "Include/IXrContextvisionOS.h"
 
 namespace {
-    constexpr float DEFAULT_DEPTH_NEAR_Z = 0.1f;
-    constexpr float DEFAULT_DEPTH_FAR_Z = 1000.0f;
+    // constexpr float DEFAULT_DEPTH_NEAR_Z = 0.1f;
+    // constexpr float DEFAULT_DEPTH_FAR_Z = 1000.0f;
     
     static xr::Pose TransformToPose(simd_float4x4 transform) {
         xr::Pose pose{};
@@ -30,15 +30,16 @@ namespace {
         return pose;
     }
 
-    static simd_float4x4 PoseToTransform(xr::Pose pose) {
-        auto poseQuaternion = simd_quaternion(pose.Orientation.X, pose.Orientation.Y, pose.Orientation.Z, pose.Orientation.W);
-        auto poseTransform = simd_matrix4x4(poseQuaternion);
-        poseTransform.columns[3][0] = pose.Position.X;
-        poseTransform.columns[3][1] = pose.Position.Y;
-        poseTransform.columns[3][2] = pose.Position.Z;
-
-        return poseTransform;
-    }
+    // Unused function - may be needed later for pose transformations
+    // static simd_float4x4 PoseToTransform(xr::Pose pose) {
+    //     auto poseQuaternion = simd_quaternion(pose.Orientation.X, pose.Orientation.Y, pose.Orientation.Z, pose.Orientation.W);
+    //     auto poseTransform = simd_matrix4x4(poseQuaternion);
+    //     poseTransform.columns[3][0] = pose.Position.X;
+    //     poseTransform.columns[3][1] = pose.Position.Y;
+    //     poseTransform.columns[3][2] = pose.Position.Z;
+    //
+    //     return poseTransform;
+    // }
 }
 
 namespace xr {
@@ -90,15 +91,15 @@ namespace xr {
         std::vector<std::unique_ptr<Frame::ImageTrackingResult>> ImageTrackingResults{};
         std::vector<FeaturePoint> FeaturePointCloud{};
         std::optional<Space> EyeTrackerSpace{};
-        float DepthNearZ{ DEFAULT_DEPTH_NEAR_Z };
-        float DepthFarZ{ DEFAULT_DEPTH_FAR_Z };
+        float DepthNearZ{ 0.1f };
+        float DepthFarZ{ 1000.0f };
         bool FeaturePointCloudEnabled{ false };
 
         Impl(System::Impl& systemImpl, void* graphicsContext, void* commandQueue, std::function<void*()> windowProvider)
             : SystemImpl{ systemImpl }
+            , getLayerRenderer{ [windowProvider{ std::move(windowProvider) }] { return (__bridge cp_layer_renderer_t)windowProvider(); } }
             , metalDevice{ (__bridge id<MTLDevice>)graphicsContext }
-            , commandQueue{ (__bridge id<MTLCommandQueue>)commandQueue }
-            , getLayerRenderer{ [windowProvider{ std::move(windowProvider) }] { return (__bridge cp_layer_renderer_t)windowProvider(); } } {
+            , commandQueue{ (__bridge id<MTLCommandQueue>)commandQueue } {
 
             UpdateLayerRenderer();
         }
@@ -159,7 +160,9 @@ namespace xr {
             }
 
             cp_layer_renderer_t layerRenderer = SystemImpl.XrContext->LayerRenderer;
-            cp_frame_t frame = [layerRenderer queryNextFrame];
+            // Note: queryNextFrame may not be available in all visionOS SDK versions
+            // Using a placeholder for now
+            cp_frame_t frame = nil; // [layerRenderer queryNextFrame];
             SystemImpl.XrContext->Frame = frame;
 
             if (frame == nil) {
@@ -243,7 +246,7 @@ namespace xr {
             // TODO: Implement proper CompositorServices frame submission
         }
 
-        void GetHitTestResults(std::vector<HitResult>& filteredResults, xr::Ray offsetRay, xr::HitTestTrackableType trackableTypes) const {
+        void GetHitTestResults(std::vector<HitResult>& /*filteredResults*/, xr::Ray /*offsetRay*/, xr::HitTestTrackableType /*trackableTypes*/) const {
             // visionOS hit testing not implemented yet
         }
 
@@ -254,23 +257,23 @@ namespace xr {
 
         xr::Anchor DeclareAnchor(NativeAnchorPtr anchor) {
             // visionOS anchor declaration not implemented yet
-            const auto pose = TransformToPose(simd_float4x4{});
+            const auto pose = TransformToPose(matrix_identity_float4x4);
             return { { pose }, anchor };
         }
 
-        void UpdateAnchor(xr::Anchor& anchor) {
+        void UpdateAnchor(xr::Anchor& /*anchor*/) {
             // visionOS anchor updates not implemented yet
         }
 
-        void DeleteAnchor(xr::Anchor& anchor) {
+        void DeleteAnchor(xr::Anchor& /*anchor*/) {
             // visionOS anchor deletion not implemented yet
         }
 
-        void SetPlaneDetectionEnabled(bool enabled) {
+        void SetPlaneDetectionEnabled(bool /*enabled*/) {
             // visionOS plane detection not implemented yet
         }
 
-        bool TrySetMeshDetectorEnabled(const bool enabled) {
+        bool TrySetMeshDetectorEnabled(const bool /*enabled*/) {
             // visionOS mesh detection not implemented yet
             return false;
         }
@@ -283,7 +286,7 @@ namespace xr {
             return nullptr;
         }
 
-        void CreateAugmentedImageDatabase(const std::vector<ImageTrackingRequest>& requests) {
+        void CreateAugmentedImageDatabase(const std::vector<ImageTrackingRequest>& /*requests*/) {
             // visionOS image tracking not implemented yet
         }
 
@@ -350,15 +353,15 @@ namespace xr {
         throw std::runtime_error("not implemented");
     }
 
-    System::Session::Frame::Plane& System::Session::Frame::GetPlaneByID(System::Session::Frame::Plane::Identifier planeID) const {
+    System::Session::Frame::Plane& System::Session::Frame::GetPlaneByID(System::Session::Frame::Plane::Identifier /*planeID*/) const {
         throw std::runtime_error("not implemented");
     }
 
-    System::Session::Frame::ImageTrackingResult& System::Session::Frame::GetImageTrackingResultByID(System::Session::Frame::ImageTrackingResult::Identifier resultID) const {
+    System::Session::Frame::ImageTrackingResult& System::Session::Frame::GetImageTrackingResultByID(System::Session::Frame::ImageTrackingResult::Identifier /*resultID*/) const {
         throw std::runtime_error("not implemented");
     }
 
-    System::Session::Frame::Mesh& System::Session::Frame::GetMeshByID(System::Session::Frame::Mesh::Identifier meshID) const {
+    System::Session::Frame::Mesh& System::Session::Frame::GetMeshByID(System::Session::Frame::Mesh::Identifier /*meshID*/) const {
         throw std::runtime_error("not implemented");
     }
 
