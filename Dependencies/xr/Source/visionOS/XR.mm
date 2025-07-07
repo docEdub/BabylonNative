@@ -160,25 +160,36 @@ namespace xr {
             }
 
             cp_layer_renderer_t layerRenderer = SystemImpl.XrContext->LayerRenderer;
-            // Note: queryNextFrame may not be available in all visionOS SDK versions
-            // Using a placeholder for now
-            cp_frame_t frame = nil; // [layerRenderer queryNextFrame];
+            
+            if (layerRenderer == nil) {
+                return std::make_unique<Frame>(*this);
+            }
+
+            // Get the next frame from CompositorServices
+            cp_frame_t frame = cp_layer_renderer_query_next_frame(layerRenderer);
             SystemImpl.XrContext->Frame = frame;
 
             if (frame == nil) {
                 return std::make_unique<Frame>(*this);
             }
 
-            // Simplified frame handling for visionOS (CompositorServices integration)
-            // TODO: Implement proper cp_frame_timing_t integration when API is stable
+            // Get frame timing information (for future use)
+            (void)cp_frame_predict_timing(frame);
             
-            if (layerRenderer != nil) {
-                // Use default texture size for now
-                uint32_t width = 1920;
-                uint32_t height = 1080;
+            // Get the drawable for rendering
+            cp_drawable_t drawable = cp_frame_query_drawable(frame);
+            if (drawable == nil) {
+                return std::make_unique<Frame>(*this);
+            }
+            
+            id<MTLTexture> colorTexture = cp_drawable_get_color_texture(drawable, 0);
+            
+            if (colorTexture != nil) {
+                uint32_t width = (uint32_t)[colorTexture width];
+                uint32_t height = (uint32_t)[colorTexture height];
 
                 if (ActiveFrameViews[0].ColorTextureSize.Width != width || ActiveFrameViews[0].ColorTextureSize.Height != height) {
-                    // Color texture
+                    // Update color texture
                     {
                         if (ActiveFrameViews[0].ColorTexturePointer != nil) {
                             id<MTLTexture> oldColorTexture = (__bridge_transfer id<MTLTexture>)ActiveFrameViews[0].ColorTexturePointer;
@@ -188,16 +199,13 @@ namespace xr {
                             ActiveFrameViews[0].ColorTexturePointer = nil;
                         }
 
-                        // Create a basic metal texture for now
-                        MTLTextureDescriptor *colorDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:width height:height mipmapped:NO];
-                        colorDesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-                        id<MTLTexture> colorTexture = [metalDevice newTextureWithDescriptor:colorDesc];
+                        // Use the CompositorServices texture directly
                         ActiveFrameViews[0].ColorTexturePointer = (__bridge_retained void*)colorTexture;
                         ActiveFrameViews[0].ColorTextureFormat = TextureFormat::BGRA8_SRGB;
                         ActiveFrameViews[0].ColorTextureSize = {width, height};
                     }
 
-                    // Depth texture
+                    // Create depth texture to match color texture dimensions
                     {
                         if (ActiveFrameViews[0].DepthTexturePointer != nil) {
                             id<MTLTexture> oldDepthTexture = (__bridge_transfer id<MTLTexture>)ActiveFrameViews[0].DepthTexturePointer;
@@ -207,7 +215,6 @@ namespace xr {
                             ActiveFrameViews[0].DepthTexturePointer = nil;
                         }
 
-                        // Create a basic depth texture for now  
                         MTLTextureDescriptor *depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:width height:height mipmapped:NO];
                         depthDesc.usage = MTLTextureUsageRenderTarget;
                         depthDesc.storageMode = MTLStorageModePrivate;
@@ -218,9 +225,29 @@ namespace xr {
                     }
                 }
 
-                // Create basic view matrices for visionOS
-                simd_float4x4 viewMatrix = matrix_identity_float4x4;
+                // For now, use a basic head pose - in a full implementation,
+                // this would integrate with ARKit or other tracking systems
+                simd_float4x4 headTransform = matrix_identity_float4x4;
+                
+                // Position the head slightly back from origin for testing
+                headTransform.columns[3][2] = -1.5f; // Move 1.5 units back
+                
+                // Create view matrix (inverse of head transform)  
+                simd_float4x4 viewMatrix = simd_inverse(headTransform);
+                
+                // Create projection matrix for visionOS
+                // Use a typical VR field of view (90 degrees horizontal, adjusted for aspect ratio)
+                float fovRadians = 90.0f * M_PI / 180.0f;
+                float aspectRatio = (float)width / (float)height;
+                float tanHalfFov = tanf(fovRadians * 0.5f);
+                
                 simd_float4x4 projectionMatrix = matrix_identity_float4x4;
+                projectionMatrix.columns[0][0] = 1.0f / (aspectRatio * tanHalfFov);
+                projectionMatrix.columns[1][1] = 1.0f / tanHalfFov;
+                projectionMatrix.columns[2][2] = -(DepthFarZ + DepthNearZ) / (DepthFarZ - DepthNearZ);
+                projectionMatrix.columns[2][3] = -1.0f;
+                projectionMatrix.columns[3][2] = -(2.0f * DepthFarZ * DepthNearZ) / (DepthFarZ - DepthNearZ);
+                projectionMatrix.columns[3][3] = 0.0f;
                 
                 // Set view pose
                 auto viewPose = TransformToPose(simd_inverse(viewMatrix));
@@ -242,8 +269,20 @@ namespace xr {
         }
 
         void DrawFrame() {
-            // Simplified frame drawing for visionOS
-            // TODO: Implement proper CompositorServices frame submission
+            // Present the frame to CompositorServices
+            if (SystemImpl.XrContext->IsInitialized() && SystemImpl.XrContext->Frame != nil) {
+                cp_frame_t frame = SystemImpl.XrContext->Frame;
+                
+                // Get the drawable and present it
+                cp_drawable_t drawable = cp_frame_query_drawable(frame);
+                if (drawable != nil) {
+                    // The drawable will be presented automatically by CompositorServices
+                    // when we end the frame submission
+                }
+                
+                // End the frame submission
+                cp_frame_end_submission(frame);
+            }
         }
 
         void GetHitTestResults(std::vector<HitResult>& /*filteredResults*/, xr::Ray /*offsetRay*/, xr::HitTestTrackableType /*trackableTypes*/) const {

@@ -1,5 +1,6 @@
 import SwiftUI
 import CompositorServices
+import _CompositorServices_SwiftUI
 
 class MetalView: UIView {
   override init(frame: CGRect) {
@@ -70,21 +71,16 @@ struct MetalViewRepresentable: UIViewRepresentable {
   func updateUIView(_ uiView: MetalView, context: Context) {}
 }
 
-struct ImmersiveView: View {
-    var body: some View {
-        Text("Immersive Mode Active")
-            .font(.largeTitle)
-            .foregroundColor(.green)
-            .onAppear {
-                // For now, we'll simulate immersive mode without CompositorLayer
-                // This can be expanded once the visionOS CompositorServices API is stable
-                if let bridge = LibNativeBridge.sharedInstance() {
-                    bridge.setupImmersiveMode(withLayerRenderer: nil)
-                    
-                    let renderLoop = RenderLoop(bridge: bridge)
-                    renderLoop.start()
-                }
+struct ImmersiveView: ImmersiveSpaceContent {
+    var body: some ImmersiveSpaceContent {
+        CompositorLayer(configuration: .default) { layerRenderer in
+            if let bridge = LibNativeBridge.sharedInstance() {
+                bridge.setupImmersiveMode(withLayerRenderer: layerRenderer)
+                
+                let renderLoop = RenderLoop(bridge: bridge)
+                renderLoop.start()
             }
+        }
     }
 }
 
@@ -118,6 +114,8 @@ class RenderLoop {
 @main
 struct ExampleApp: App {
   @State private var isImmersive = false
+  @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+  @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
   
   var body: some Scene {
     WindowGroup {
@@ -126,7 +124,9 @@ struct ExampleApp: App {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         
         Button("Enter Immersive Mode") {
-          isImmersive = true
+          Task {
+            await openImmersiveSpace(id: "ImmersiveSpace")
+          }
         }
         .padding()
       }
@@ -135,31 +135,7 @@ struct ExampleApp: App {
     
     ImmersiveSpace(id: "ImmersiveSpace") {
       ImmersiveView()
-        .onAppear {
-          // Hide the main window when entering immersive mode
-          if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            windowScene.windows.forEach { window in
-              window.isHidden = true
-            }
-          }
-        }
-        .onDisappear {
-          // Show the main window when exiting immersive mode
-          if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            windowScene.windows.forEach { window in
-              window.isHidden = false
-            }
-          }
-          isImmersive = false
-        }
     }
     .immersionStyle(selection: .constant(.full), in: .full)
-    .onChange(of: isImmersive) { _, newValue in
-      if newValue {
-        Task {
-          // await openImmersiveSpace(id: "ImmersiveSpace")
-        }
-      }
-    }
   }
 }
