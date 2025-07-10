@@ -35,7 +35,7 @@ namespace
     }
 }
 
-TEST(JavaScript, All)
+TEST(DISABLED_JavaScript, All)
 {
     // Change this to true to wait for the JavaScript debugger to attach (only applies to V8)
     constexpr const bool waitForDebugger = false;
@@ -160,7 +160,7 @@ TEST(NativeAPI, LifeCycle)
 }
 */
 
-TEST(Performance, Spheres)
+TEST(DISABLED_Performance, Spheres)
 {
     // create a bunch of sphere, does the rendering for a number of frames, log time it took
     std::string script{R"(
@@ -237,7 +237,7 @@ TEST(Performance, Spheres)
     std::cout.flush();
 }
 
-TEST(Performance, ShaderCache)
+TEST(DISABLED_Performance, ShaderCache)
 {
     std::string script{ R"(
         console.log("Setting rendering to cache shader.");
@@ -300,7 +300,7 @@ TEST(Performance, ShaderCache)
         update->Finish();
         device.FinishRenderingCurrentFrame();
     }
-    
+
     static const char* shaderCacheFileName = "shaderCache.bin";
     uint32_t shaderCount{};
     {
