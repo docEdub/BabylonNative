@@ -18,21 +18,21 @@
 namespace
 {
     Babylon::Graphics::Configuration deviceConfig{};
+}
 
-    const char* EnumToString(Babylon::Polyfills::Console::LogLevel logLevel)
+const char* EnumToString(Babylon::Polyfills::Console::LogLevel logLevel)
+{
+    switch (logLevel)
     {
-        switch (logLevel)
-        {
-            case Babylon::Polyfills::Console::LogLevel::Log:
-                return "log";
-            case Babylon::Polyfills::Console::LogLevel::Warn:
-                return "warn";
-            case Babylon::Polyfills::Console::LogLevel::Error:
-                return "error";
-        }
-
-        return "unknown";
+        case Babylon::Polyfills::Console::LogLevel::Log:
+            return "log";
+        case Babylon::Polyfills::Console::LogLevel::Warn:
+            return "warn";
+        case Babylon::Polyfills::Console::LogLevel::Error:
+            return "error";
     }
+
+    return "unknown";
 }
 
 TEST(DISABLED_JavaScript, All)

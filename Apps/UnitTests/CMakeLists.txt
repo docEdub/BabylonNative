@@ -21,7 +21,7 @@ if(APPLE)
     set(ADDITIONAL_LIBRARIES PRIVATE ${JAVASCRIPTCORE_LIBRARY})
     if(IOS)
         set(SOURCES ${SOURCES} "iOS/App.mm"
-            "Shared/Scenario1.cpp")
+            "iOS/Scenario1.cpp")
     else()
         set(SOURCES ${SOURCES} "macOS/App.mm")
     endif()
