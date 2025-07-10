@@ -1,5 +1,5 @@
 # Build only on Win32, not on UWP
-if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT IOS) OR (UNIX AND NOT ANDROID)))
+if(NOT((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NOT VISIONOS) OR (UNIX AND NOT ANDROID)))
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
@@ -19,7 +19,11 @@ set(SOURCES
 if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
     set(ADDITIONAL_LIBRARIES PRIVATE ${JAVASCRIPTCORE_LIBRARY})
-    set(SOURCES ${SOURCES} "Apple/App.mm")
+    if(IOS)
+        set(SOURCES ${SOURCES} "iOS/App.mm")
+    else()
+        set(SOURCES ${SOURCES} "macOS/App.mm")
+    endif()
 elseif(UNIX AND NOT ANDROID)
     set(SOURCES ${SOURCES} "X11/App.cpp")
 elseif(WIN32)
@@ -43,6 +47,18 @@ target_link_libraries(UnitTests
     ${ADDITIONAL_LIBRARIES})
 
 add_test(NAME UnitTests COMMAND UnitTests)
+
+if(IOS)
+    set_source_files_properties(
+        ${SCRIPTS}
+        ${EXTERNAL_SCRIPTS}
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Scripts")
+
+    set_target_properties(UnitTests PROPERTIES
+        MACOSX_BUNDLE true
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/iOS/Info.plist"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.BabylonNative.UnitTests.iOS")
+endif()
 
 # See https://gitlab.kitware.com/cmake/cmake/-/issues/23543
 # If we can set minimum required to 3.26+, then we can use the `copy -t` syntax instead.
