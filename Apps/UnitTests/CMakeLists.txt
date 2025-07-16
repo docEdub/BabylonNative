@@ -63,23 +63,24 @@ if(IOS)
     set_target_properties(UnitTests PROPERTIES
         MACOSX_BUNDLE true
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/iOS/Info.plist"
+        RESOURCE "${SCRIPTS};${EXTERNAL_SCRIPTS}"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "18.0"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.BabylonNative.UnitTests.iOS")
+else()
+    # See https://gitlab.kitware.com/cmake/cmake/-/issues/23543
+    # If we can set minimum required to 3.26+, then we can use the `copy -t` syntax instead.
+    add_custom_command(TARGET UnitTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:$<TARGET_RUNTIME_DLLS:UnitTests>>,copy,true> $<TARGET_RUNTIME_DLLS:UnitTests> $<TARGET_FILE_DIR:UnitTests> COMMAND_EXPAND_LISTS)
+
+    foreach(SCRIPT ${SCRIPTS} ${EXTERNAL_SCRIPTS})
+        get_filename_component(SCRIPT_NAME "${SCRIPT}" NAME)
+        add_custom_command(
+            OUTPUT "${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
+            COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}" "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
+            COMMENT "Copying ${SCRIPT_NAME}"
+            MAIN_DEPENDENCY "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}")
+    endforeach()
 endif()
-
-# See https://gitlab.kitware.com/cmake/cmake/-/issues/23543
-# If we can set minimum required to 3.26+, then we can use the `copy -t` syntax instead.
-add_custom_command(TARGET UnitTests POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:$<TARGET_RUNTIME_DLLS:UnitTests>>,copy,true> $<TARGET_RUNTIME_DLLS:UnitTests> $<TARGET_FILE_DIR:UnitTests> COMMAND_EXPAND_LISTS)
-
-foreach(SCRIPT ${SCRIPTS} ${EXTERNAL_SCRIPTS})
-    get_filename_component(SCRIPT_NAME "${SCRIPT}" NAME)
-    add_custom_command(
-        OUTPUT "${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
-        COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}" "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Scripts/${SCRIPT_NAME}"
-        COMMENT "Copying ${SCRIPT_NAME}"
-        MAIN_DEPENDENCY "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}")
-endforeach()
 
 set_property(TARGET UnitTests PROPERTY FOLDER Apps)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${SCRIPTS})
