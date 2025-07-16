@@ -12,6 +12,8 @@
 
 #include <gtest/gtest.h>
 
+#include <CoreMedia/CMTime.h>
+
 namespace
 {
     std::optional<Babylon::Graphics::Device> device{};
@@ -25,6 +27,8 @@ namespace
 
     thread_safe_action_queue pendingTextureUpdateQueue;
     thread_safe_action_queue pendingTextureRemovalQueue;
+
+    std::optional<Babylon::Plugins::ExternalTexture> exportTexture{};
 
     void PerformQueuedUpdateActions()
     {
@@ -118,6 +122,54 @@ namespace
         });
     }
 
+    void Deinitialize()
+    {
+        if (device)
+        {
+            deviceUpdate->Finish();
+            device->FinishRenderingCurrentFrame();
+        }
+
+        sourceTextures.clear();
+
+        runtime.reset();
+        deviceUpdate.reset();
+        device.reset();
+    }
+
+    void WriteFrame(CMTime frameTime, std::function<void(bool)> completionHandler)
+    {
+        assert([NSThread isMainThread]);
+
+        if (!device)
+        {
+            completionHandler(false);
+            return;
+        }
+
+        isExporting = true;
+
+        // TODO: Write the frame to a file?
+        // See clipchamp-mobile PlayerViewModel.swift:499.
+    }
+
+    void StartExporting(id<MTLTexture> texture, std::function<void(bool)> completionHandler)
+    {
+        assert([NSThread isMainThread]);
+
+        if (!device)
+        {
+            completionHandler(false);
+            return;
+        }
+
+        isExporting = true;
+
+        // TODO: Start exporting the texture?
+        // In Clipchamp, this is a JavaScript call made via Napi ... `env.Global().Get("startExporting").As<Napi::Function>().Call({ ... });`
+        // See clipchamp-mobile mobileApp.ts:228 for the JavaScript implementation of the "startExporting" function.
+    }
+
     /// Creates bindings exposing iOS functionality into javascript code
     void DispatchBindings()
     {
@@ -184,24 +236,25 @@ namespace
 
             // MARK: - Export APIs
 
-            // env.Global().Set("writeFrame", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
-            //     Napi::Promise::Deferred deferred{info.Env()};
-            //     double timeInMs = info[0].As<Napi::Number>().DoubleValue();
-            //     CMTime frameTime = CMTimeMakeWithSeconds(timeInMs / 1000.0, 300);
-            //     [_delegate writeFrame:frameTime
-            //         completionHandler:^(bool isFinished) {
-            //           runtime->Dispatch([self, deferred, isFinished = std::move(isFinished)](Napi::Env env) {
-            //               deferred.Resolve(Napi::Boolean::New(env, isFinished));
-            //               if (isFinished)
-            //               {
-            //                   dispatch_async(dispatch_get_main_queue(), ^{
-            //                     exportTexture.reset();
-            //                   });
-            //               }
-            //           });
-            //         }];
-            //     return deferred.Promise();
-            // }));
+            env.Global().Set("writeFrame", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+                Napi::Promise::Deferred deferred{info.Env()};
+                double timeInMs = info[0].As<Napi::Number>().DoubleValue();
+                CMTime frameTime = CMTimeMakeWithSeconds(timeInMs / 1000.0, 300);
+                WriteFrame(frameTime, std::function<void(bool)>([deferred](bool isFinished) {
+                    runtime->Dispatch([deferred, isFinished = std::move(isFinished)](Napi::Env env) {
+                        deferred.Resolve(Napi::Boolean::New(env, isFinished));
+
+                        if (isFinished)
+                        {
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                              exportTexture.reset();
+                            });
+                        }
+                    });
+                }));
+
+                return deferred.Promise();
+            }));
 
             // env.Global().Set("renderFrame", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
             //     [self updateTotalFrameDuration];

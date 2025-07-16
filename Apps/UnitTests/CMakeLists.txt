@@ -20,8 +20,11 @@ if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
     set(ADDITIONAL_LIBRARIES PRIVATE ${JAVASCRIPTCORE_LIBRARY})
     if(IOS)
+        find_library(COREMEDIA_FRAMEWORK CoreMedia)
         find_library(METALKIT_FRAMEWORK MetalKit)
-        set(ADDITIONAL_LIBRARIES PRIVATE ${ADDITIONAL_LIBRARIES} ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
+        set(ADDITIONAL_LIBRARIES PRIVATE ${ADDITIONAL_LIBRARIES}
+            ${COREMEDIA_FRAMEWORK}
+            ${METALKIT_FRAMEWORK})
         set(SOURCES ${SOURCES} "iOS/App.mm"
             "iOS/Scenario1.cpp")
     else()
