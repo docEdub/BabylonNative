@@ -47,7 +47,6 @@ target_link_libraries(UnitTests
     PRIVATE GraphicsDevice
     PRIVATE NativeEngine
     PRIVATE ScriptLoader
-    PRIVATE UrlLib
     PRIVATE Window
     PRIVATE XMLHttpRequest
     PRIVATE gtest_main
