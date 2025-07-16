@@ -20,6 +20,8 @@ if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)
     set(ADDITIONAL_LIBRARIES PRIVATE ${JAVASCRIPTCORE_LIBRARY})
     if(IOS)
+        find_library(METALKIT_FRAMEWORK MetalKit)
+        set(ADDITIONAL_LIBRARIES PRIVATE ${ADDITIONAL_LIBRARIES} ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
         set(SOURCES ${SOURCES} "iOS/App.mm"
             "iOS/Scenario1.cpp")
     else()
@@ -38,6 +40,7 @@ target_link_libraries(UnitTests
     PRIVATE AppRuntime
     PRIVATE Canvas
     PRIVATE Console
+    PRIVATE ExternalTexture
     PRIVATE GraphicsDevice
     PRIVATE NativeEngine
     PRIVATE ScriptLoader
@@ -58,6 +61,7 @@ if(IOS)
     set_target_properties(UnitTests PROPERTIES
         MACOSX_BUNDLE true
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/iOS/Info.plist"
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "18.0"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.BabylonNative.UnitTests.iOS")
 endif()
 

@@ -1,7 +1,10 @@
 #include "../Shared/Shared.h"
+#include "../Shared/ThreadSafeActionQueue.h"
 
 #include <Babylon/AppRuntime.h>
+#include <Babylon/ScriptLoader.h>
 #include <Babylon/Graphics/Device.h>
+#include <Babylon/Plugins/ExternalTexture.h>
 #include <Babylon/Plugins/NativeEngine.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
@@ -9,15 +12,31 @@
 
 #include <gtest/gtest.h>
 
-#include <Foundation/NSThread.h>
-#include <Metal/Metal.h>
-
-namespace {
+namespace
+{
     std::optional<Babylon::Graphics::Device> device{};
     std::optional<Babylon::Graphics::DeviceUpdate> deviceUpdate{};
     std::optional<Babylon::AppRuntime> runtime{};
 
+    bool isExporting = false;
     bool hasStartedRenderingFrame = false;
+
+    std::unordered_map<long, Babylon::Plugins::ExternalTexture> sourceTextures;
+
+    thread_safe_action_queue pendingTextureUpdateQueue;
+    thread_safe_action_queue pendingTextureRemovalQueue;
+
+    void PerformQueuedUpdateActions()
+    {
+        assert([NSThread isMainThread]);
+        pendingTextureUpdateQueue.performQueuedActions();
+    }
+
+    void PerformQueuedRemovalActions()
+    {
+        assert([NSThread isMainThread]);
+        pendingTextureRemovalQueue.performQueuedActions();
+    }
 
     void StartRenderingNextFrame()
     {
@@ -38,6 +57,48 @@ namespace {
         deviceUpdate->Start();
     }
 
+    void FinishRenderingCurrentFrame()
+    {
+        assert([NSThread isMainThread]);
+
+        if (!device)
+        {
+            return;
+        }
+
+        if (!hasStartedRenderingFrame)
+        {
+            return;
+        }
+
+        deviceUpdate->Finish();
+
+        PerformQueuedUpdateActions();
+
+        device->FinishRenderingCurrentFrame();
+
+        if (isExporting)
+        {
+            // Since buffers are queued in order, we can create a new buffer and wait for it complete, which in turn
+            // means all previous buffers will also be completed at this point. This is necessary to ensure that the
+            // export texture is ready to be read from.
+            auto buffer = ((__bridge id<MTLCommandQueue>)device->GetPlatformInfo().CommandQueue).commandBuffer;
+            [buffer commit];
+            [buffer waitUntilCompleted];
+        }
+
+        PerformQueuedRemovalActions();
+
+        hasStartedRenderingFrame = false;
+    }
+
+    void RenderFrame()
+    {
+        assert([NSThread isMainThread]);
+        FinishRenderingCurrentFrame();
+        StartRenderingNextFrame();
+    }
+
     void InitializeBabylonServices()
     {
         runtime->Dispatch([](Napi::Env env) {
@@ -56,20 +117,123 @@ namespace {
             Babylon::Plugins::NativeEngine::Initialize(env);
         });
     }
+
+    /// Creates bindings exposing iOS functionality into javascript code
+    void DispatchBindings()
+    {
+        auto loadTexture = [device = (__bridge id<MTLDevice>)device->GetPlatformInfo().Device]() {
+            MTKTextureLoader* loader = [[MTKTextureLoader alloc] initWithDevice:device];
+            // NSString* filename = @"sample_image";
+            // NSString* extension = @"jpg";
+            NSURL* url = [[NSBundle mainBundle] URLForResource:@"sample_image" withExtension:@"jpg"];
+            id<MTLTexture> texture = [loader newTextureWithContentsOfURL:url
+                                                                 options:@{
+                                                                     MTKTextureLoaderOptionSRGB : @NO,
+                                                                 }
+                                                                   error:nil];
+            return Babylon::Plugins::ExternalTexture{texture};
+        };
+
+        runtime->Dispatch([loadTexture = std::move(loadTexture)](Napi::Env env) {
+            // MARK: - Source APIs
+
+            env.Global().Set("createSource", Napi::Function::New(env, [loadTexture = std::move(loadTexture)](const Napi::CallbackInfo& info) {
+                int sourceId = info[0].As<Napi::Number>().Int32Value();
+                std::string assetId = info[1].As<Napi::String>().Utf8Value();
+
+                Napi::Promise::Deferred deferred{info.Env()};
+
+                // Texture creation on the main thread
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  auto externalTexture = loadTexture();
+
+                  // Notably we're copying the texture here rather than moving, since we're reusing the original texture in the dispatch below
+                  auto insertResult = sourceTextures.insert({sourceId, externalTexture});
+
+                  // Ensure the insert succeeded. This will fail if there was already a value in the map matching the sourceId
+                  assert(insertResult.second);
+
+                  runtime->Dispatch([deferred, externalTexture = std::move(externalTexture)](Napi::Env env) {
+                      // We need to ensure we persist the AddToContextAsync promise
+                      auto addToContextPromise = std::make_shared<Napi::Reference<Napi::Promise>>(
+                          Napi::Persistent(externalTexture.AddToContextAsync(env)));
+
+                      dispatch_async(dispatch_get_main_queue(), ^{
+                        RenderFrame();
+                        runtime->Dispatch([deferred, addToContextPromise = std::move(addToContextPromise)](Napi::Env env) {
+                            deferred.Resolve(addToContextPromise->Value());
+                        });
+                      });
+                  });
+                });
+
+                return deferred.Promise();
+            }));
+
+            env.Global().Set("destroySource", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+                int sourceId = info[0].As<Napi::Number>().Int32Value();
+
+                // The source texture can only be removed between frame renders, so we queue the removal for the next available render.
+                pendingTextureRemovalQueue.queueAction([sourceId]() {
+                    if (sourceTextures.find(sourceId) != sourceTextures.end())
+                    {
+                        sourceTextures.erase(sourceId);
+                    }
+                });
+            }));
+
+            // MARK: - Export APIs
+
+            // env.Global().Set("writeFrame", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
+            //     Napi::Promise::Deferred deferred{info.Env()};
+            //     double timeInMs = info[0].As<Napi::Number>().DoubleValue();
+            //     CMTime frameTime = CMTimeMakeWithSeconds(timeInMs / 1000.0, 300);
+            //     [_delegate writeFrame:frameTime
+            //         completionHandler:^(bool isFinished) {
+            //           runtime->Dispatch([self, deferred, isFinished = std::move(isFinished)](Napi::Env env) {
+            //               deferred.Resolve(Napi::Boolean::New(env, isFinished));
+            //               if (isFinished)
+            //               {
+            //                   dispatch_async(dispatch_get_main_queue(), ^{
+            //                     exportTexture.reset();
+            //                   });
+            //               }
+            //           });
+            //         }];
+            //     return deferred.Promise();
+            // }));
+
+            // env.Global().Set("renderFrame", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
+            //     [self updateTotalFrameDuration];
+            //     Napi::Promise::Deferred deferred{info.Env()};
+            //     dispatch_async(dispatch_get_main_queue(), ^{
+            //       [self renderFrame];
+            //       runtime->Dispatch([deferred](Napi::Env env) {
+            //           deferred.Resolve(env.Undefined());
+            //       });
+            //     });
+            //     return deferred.Promise();
+            // }));
+
+            // env.Global().Set("readFont", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
+            //     std::string assetId = info[0].As<Napi::String>().Utf8Value();
+            //     NSData* data = [_delegate loadFontData:[NSString stringWithCString:assetId.c_str() encoding:NSUTF8StringEncoding]];
+            //     if (data != nil)
+            //     {
+            //         NSUInteger length = [data length];
+
+            //         Napi::ArrayBuffer buffer = Napi::ArrayBuffer::New(info.Env(), length);
+            //         [data getBytes:buffer.Data() length:length];
+            //         return buffer;
+            //     }
+            //     return Napi::ArrayBuffer::New(info.Env(), 0);
+            // }));
+        });
+    }
 }
 
 TEST(Scenario1, Init)
 {
-    // std::optional<Babylon::Plugins::ExternalTexture> exportTexture{};
-    // std::unordered_map<long, Babylon::Plugins::ExternalTexture> sourceTextures;
-    // thread_safe_action_queue pendingTextureUpdateQueue;
-    // thread_safe_action_queue pendingTextureRemovalQueue;
-
-    // Napi::FunctionReference loadProject;
-    // Napi::FunctionReference updateItemTransform;
-    // Napi::FunctionReference updateItem;
-    // Napi::FunctionReference seek;
-
     auto mtlDevice = MTLCreateSystemDefaultDevice();
 
     Babylon::Graphics::Configuration config{};
@@ -86,9 +250,9 @@ TEST(Scenario1, Init)
     runtime.emplace();
 
     InitializeBabylonServices();
-    // [self dispatchBindings];
+    DispatchBindings();
 
-    // Babylon::ScriptLoader loader{ *runtime };
+    Babylon::ScriptLoader loader{*runtime};
     // loader.LoadScript("app:///Superfill/superfillCompositor.js");
 
     // NSString *errorPtr = nil;
