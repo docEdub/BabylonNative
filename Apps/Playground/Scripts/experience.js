@@ -21,7 +21,7 @@ const imageTracking = false;
 const readPixels = false;
 
 function CreateBoxAsync(scene) {
-    BABYLON.Mesh.CreateBox("box1", 0.2, scene);
+    BABYLON.MeshBuilder.CreateBox("box1", {size: 0.2}, scene);
     return Promise.resolve();
 }
 
@@ -30,7 +30,7 @@ function CreateSpheresAsync(scene) {
     for (let i = 0; i < size; i++) {
         for (let j = 0; j < size; j++) {
             for (let k = 0; k < size; k++) {
-                const sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
+                const sphere = BABYLON.MeshBuilder.CreateSphere("sphere" + i + j + k, {segments: 32, diameter: 0.9}, scene);
                 sphere.position.x = i;
                 sphere.position.y = j;
                 sphere.position.z = k;
@@ -46,7 +46,7 @@ const scene = new BABYLON.Scene(engine);
 
 CreateBoxAsync(scene).then(function () {
     // Create a green sphere in the center for visionOS immersive-vr testing
-    const greenSphere = BABYLON.Mesh.CreateSphere("greenSphere", 32, 0.5, scene);
+    const greenSphere = BABYLON.MeshBuilder.CreateSphere("greenSphere", {segments: 32, diameter: 0.5}, scene);
     greenSphere.position = new BABYLON.Vector3(0, 0, 2);
     const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
     greenMaterial.diffuseColor = BABYLON.Color3.Green();
@@ -110,7 +110,7 @@ CreateBoxAsync(scene).then(function () {
 
             if (imageCapture) {
                 new Promise(resolve => setTimeout(resolve, 1000)).then(() => {
-                    const imageCapture = new ImageCapture(stream.getVideoTracks()[0]);
+                    const imageCapture = new window.ImageCapture(stream.getVideoTracks()[0]);
                     console.log(`Capabilities: ${JSON.stringify(imageCapture.getPhotoCapabilities(), null, 2)}`);
                     console.log(`Settings: ${JSON.stringify(imageCapture.getPhotoSettings(), null, 2)}`);
                     imageCapture.takePhoto({fillLightMode: "flash"}).then((blob) => {
@@ -209,8 +209,8 @@ CreateBoxAsync(scene).then(function () {
     });
 
     if (vr || ar || hololens) {
-        setTimeout(function () {
-            scene.createDefaultXRExperienceAsync({ disableDefaultUI: true, disableTeleportation: true }).then((xr) => {
+        // Auto-enter immersive-vr mode immediately after scene setup
+        scene.createDefaultXRExperienceAsync({ disableDefaultUI: true, disableTeleportation: true }).then((xr) => {
                 if (xrHitTest) {
                     // Create the hit test module. OffsetRay specifies the target direction, and entityTypes can be any combination of "mesh", "plane", and "point".
                     const xrHitTestModule = xr.baseExperience.featuresManager.enableFeature(
@@ -228,10 +228,9 @@ CreateBoxAsync(scene).then(function () {
                     });
                 }
                 else {
-                    setTimeout(function () {
-                        scene.meshes[0].position.z = 2;
-                        scene.meshes[0].rotate(BABYLON.Vector3.Up(), 3.14159);
-                    }, 5000);
+                    // Position the mesh immediately for immersive-vr mode
+                    scene.meshes[0].position.z = 2;
+                    scene.meshes[0].rotate(BABYLON.Vector3.Up(), 3.14159);
                 }
 
                 // Showing visualization for ARKit LiDAR mesh data
@@ -305,7 +304,7 @@ CreateBoxAsync(scene).then(function () {
 
                     // Next We create the point cloud system which we will use to display feature points.
                     const pcs = new BABYLON.PointsCloudSystem("pcs", 5, scene);
-                    const featurePointInitFunc = function (particle, i, s) {
+                    const featurePointInitFunc = function (particle, _i, _s) {
                         particle.position = new BABYLON.Vector3(0, -5, 0);
                     }
 
@@ -342,13 +341,13 @@ CreateBoxAsync(scene).then(function () {
                     // Listen for changes in feature points both being added and updated, and only update
                     // our display every 60 changes to the feature point cloud to avoid slowdowns.
                     let featurePointChangeCounter = 0;
-                    xrFeaturePointsModule.onFeaturePointsAddedObservable.add((addedPointIds) => {
+                    xrFeaturePointsModule.onFeaturePointsAddedObservable.add((_addedPointIds) => {
                         if (++featurePointChangeCounter % 60 == 0) {
                             pcs.setParticles();
                         }
                     });
 
-                    xrFeaturePointsModule.onFeaturePointsUpdatedObservable.add((updatedPointIds) => {
+                    xrFeaturePointsModule.onFeaturePointsUpdatedObservable.add((_updatedPointIds) => {
                         if (++featurePointChangeCounter % 60 == 0) {
                             pcs.setParticles();
                         }
@@ -383,7 +382,7 @@ CreateBoxAsync(scene).then(function () {
 
                     webXRImageTrackingModule.onTrackedImageUpdatedObservable.add((imageObject) => {
                         if (webXRTrackingMeshes[imageObject.id] === undefined) {
-                            webXRTrackingMeshes[imageObject.id] = BABYLON.Mesh.CreateBox("box1", 0.05, scene);
+                            webXRTrackingMeshes[imageObject.id] = BABYLON.MeshBuilder.CreateBox("box1", {size: 0.05}, scene);
                             const mat = new BABYLON.StandardMaterial("mat", scene);
                             mat.diffuseColor = BABYLON.Color3.Random();
                             webXRTrackingMeshes[imageObject.id].material = mat;
@@ -393,6 +392,7 @@ CreateBoxAsync(scene).then(function () {
                     });
                 }
 
+                // Auto-enter immersive-vr mode immediately
                 xr.baseExperience.enterXRAsync(sessionMode, "unbounded", xr.renderTarget).then((xrSessionManager) => {
                     if (hololens) {
                         // Pass through, head mounted displays (HoloLens 2) require autoClear and a black clear color
@@ -401,7 +401,6 @@ CreateBoxAsync(scene).then(function () {
                     }
                 });
             });
-        }, 5000);
     }
 
     if (text) {
@@ -415,7 +414,6 @@ CreateBoxAsync(scene).then(function () {
             }
         );
     }
-
-}, function (ex) {
+}).catch(function (ex) {
     console.log(ex.message, ex.stack);
 });
