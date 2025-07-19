@@ -119,17 +119,7 @@ struct ExampleApp: App {
   
   var body: some Scene {
     WindowGroup {
-      VStack {
-        MetalViewRepresentable()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-        
-        Button("Enter Immersive Mode") {
-          Task {
-            await openImmersiveSpace(id: "ImmersiveSpace")
-          }
-        }
-        .padding()
-      }
+      ContentView(isImmersive: $isImmersive, openImmersiveSpace: openImmersiveSpace)
     }
     .windowStyle(.plain)
     
@@ -137,5 +127,27 @@ struct ExampleApp: App {
       ImmersiveView()
     }
     .immersionStyle(selection: .constant(.full), in: .full)
+  }
+}
+
+struct ContentView: View {
+  @Binding var isImmersive: Bool
+  let openImmersiveSpace: OpenImmersiveSpaceAction
+  
+  var body: some View {
+    VStack {
+      MetalViewRepresentable()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      
+      Button("Enter Immersive Mode") {
+        Task {
+          await openImmersiveSpace(id: "ImmersiveSpace")
+          isImmersive = true
+        }
+      }
+      .padding()
+    }
+    .opacity(isImmersive ? 0.0 : 1.0)
+    .animation(.easeInOut(duration: 0.3), value: isImmersive)
   }
 }
