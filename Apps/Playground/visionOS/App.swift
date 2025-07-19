@@ -113,13 +113,16 @@ class RenderLoop {
 
 @main
 struct ExampleApp: App {
-  @State private var isImmersive = false
   @Environment(\.openImmersiveSpace) private var openImmersiveSpace
-  @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
   
   var body: some Scene {
     WindowGroup {
-      ContentView(isImmersive: $isImmersive, openImmersiveSpace: openImmersiveSpace)
+      ContentView()
+        .onAppear {
+          Task {
+            await openImmersiveSpace(id: "ImmersiveSpace")
+          }
+        }
     }
     .windowStyle(.plain)
     
@@ -131,23 +134,11 @@ struct ExampleApp: App {
 }
 
 struct ContentView: View {
-  @Binding var isImmersive: Bool
-  let openImmersiveSpace: OpenImmersiveSpaceAction
-  
   var body: some View {
     VStack {
       MetalViewRepresentable()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-      
-      Button("Enter Immersive Mode") {
-        Task {
-          await openImmersiveSpace(id: "ImmersiveSpace")
-          isImmersive = true
-        }
-      }
-      .padding()
+        .opacity(0.0) // Hide the windowed view since we auto-launch immersive
     }
-    .opacity(isImmersive ? 0.0 : 1.0)
-    .animation(.easeInOut(duration: 0.3), value: isImmersive)
   }
 }
