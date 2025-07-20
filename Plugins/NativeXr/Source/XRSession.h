@@ -43,6 +43,12 @@ namespace Babylon
             Plugins::XRFrame& m_xrFrame;
             uint32_t m_timestamp{ 0 };
 
+            // WebXR API properties
+            std::vector<std::string> m_enabledFeatures{};
+            std::string m_sessionType{};
+            std::string m_visibilityState{ "visible" };
+            std::string m_environmentBlendMode{ "opaque" };
+
             std::vector<std::pair<std::string, Napi::FunctionReference>> m_eventNamesAndCallbacks{};
 
             Napi::Reference<Napi::Array> m_jsInputSources{};
@@ -56,6 +62,27 @@ namespace Babylon
             Napi::Value GetInputSources(const Napi::CallbackInfo& /*info*/)
             {
                 return m_jsInputSources.Value();
+            }
+
+            Napi::Value GetEnabledFeatures(const Napi::CallbackInfo& info)
+            {
+                auto env = info.Env();
+                auto featuresArray = Napi::Array::New(env, m_enabledFeatures.size());
+                for (uint32_t i = 0; i < static_cast<uint32_t>(m_enabledFeatures.size()); i++)
+                {
+                    featuresArray.Set(i, Napi::String::New(env, m_enabledFeatures[i]));
+                }
+                return featuresArray;
+            }
+
+            Napi::Value GetVisibilityState(const Napi::CallbackInfo& info)
+            {
+                return Napi::String::New(info.Env(), m_visibilityState);
+            }
+
+            Napi::Value GetEnvironmentBlendMode(const Napi::CallbackInfo& info)
+            {
+                return Napi::String::New(info.Env(), m_environmentBlendMode);
             }
 
             void AddEventListener(const Napi::CallbackInfo& info)

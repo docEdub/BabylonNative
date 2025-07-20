@@ -221,6 +221,9 @@ namespace Babylon
                 JS_CLASS_NAME,
                 {
                     InstanceAccessor("inputSources", &XRSession::GetInputSources, nullptr),
+                    InstanceAccessor("enabledFeatures", &XRSession::GetEnabledFeatures, nullptr),
+                    InstanceAccessor("visibilityState", &XRSession::GetVisibilityState, nullptr),
+                    InstanceAccessor("environmentBlendMode", &XRSession::GetEnvironmentBlendMode, nullptr),
                     InstanceMethod("addEventListener", &XRSession::AddEventListener),
                     InstanceMethod("removeEventListener", &XRSession::RemoveEventListener),
                     InstanceMethod("requestReferenceSpace", &XRSession::RequestReferenceSpace),
@@ -245,7 +248,55 @@ namespace Babylon
             auto& session{ *XRSession::Unwrap(jsSession.Value()) };
             session.m_xr = std::move(nativeXr);
 
+            // Process features requested for this session
             auto featureObject = info[1].As<Napi::Object>();
+            
+            // Set up enabled features based on session type and platform capabilities
+            session.m_sessionType = info[0].As<Napi::String>().Utf8Value();
+            if (session.m_sessionType == "immersive-vr")
+            {
+                // For visionOS immersive-vr mode, these features are supported
+                session.m_enabledFeatures.push_back("viewer");
+                session.m_enabledFeatures.push_back("local");
+                session.m_environmentBlendMode = "opaque";
+            }
+            else if (session.m_sessionType == "immersive-ar")
+            {
+                session.m_enabledFeatures.push_back("viewer");
+                session.m_enabledFeatures.push_back("local");
+                session.m_environmentBlendMode = "additive";
+            }
+            
+            // Process additional feature requests
+            if (featureObject.Has("requiredFeatures") && featureObject.Get("requiredFeatures").IsArray())
+            {
+                auto requiredFeatures = featureObject.Get("requiredFeatures").As<Napi::Array>();
+                for (uint32_t i = 0; i < requiredFeatures.Length(); i++)
+                {
+                    auto featureStr = requiredFeatures.Get(i).As<Napi::String>().Utf8Value();
+                    // Only add if not already present and supported
+                    if (std::find(session.m_enabledFeatures.begin(), session.m_enabledFeatures.end(), featureStr) == session.m_enabledFeatures.end())
+                    {
+                        // For now, add all requested features (real implementation would validate against supported features)
+                        session.m_enabledFeatures.push_back(featureStr);
+                    }
+                }
+            }
+            
+            if (featureObject.Has("optionalFeatures") && featureObject.Get("optionalFeatures").IsArray())
+            {
+                auto optionalFeatures = featureObject.Get("optionalFeatures").As<Napi::Array>();
+                for (uint32_t i = 0; i < optionalFeatures.Length(); i++)
+                {
+                    auto featureStr = optionalFeatures.Get(i).As<Napi::String>().Utf8Value();
+                    // Only add if not already present and supported
+                    if (std::find(session.m_enabledFeatures.begin(), session.m_enabledFeatures.end(), featureStr) == session.m_enabledFeatures.end())
+                    {
+                        // For now, add all requested features (real implementation would validate against supported features)
+                        session.m_enabledFeatures.push_back(featureStr);
+                    }
+                }
+            }
             if (featureObject.Has("trackedImages"))
             {
                 const auto napiTrackedImages{ featureObject.Get("trackedImages").As<Napi::Array>() };
@@ -298,11 +349,12 @@ namespace Babylon
             , m_runtimeScheduler{ JsRuntime::GetFromJavaScript(info.Env()) }
             , m_jsXRFrame{ Napi::Persistent(Plugins::XRFrame::New(info)) }
             , m_xrFrame{ *Plugins::XRFrame::Unwrap(m_jsXRFrame.Get("_nativeImpl").As<Napi::Object>()) }
+            , m_sessionType{ info[0].As<Napi::String>().Utf8Value() }
             , m_jsInputSources{ Napi::Persistent(Napi::Array::New(info.Env())) }
         {
             // Currently only immersive VR and immersive AR are supported.
-            assert(info[0].As<Napi::String>().Utf8Value() == XRSessionType::IMMERSIVE_VR ||
-                info[0].As<Napi::String>().Utf8Value() == XRSessionType::IMMERSIVE_AR);
+            assert(m_sessionType == XRSessionType::IMMERSIVE_VR ||
+                m_sessionType == XRSessionType::IMMERSIVE_AR);
         }
 
         void XRSession::InitializeXrLayer(Napi::Object layer)
