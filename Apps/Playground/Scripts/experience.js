@@ -5,7 +5,7 @@
 
 const wireframe = false;
 const turntable = false;
-const logfps = true;
+const logfps = false;
 const ibl = false;
 const rtt = false;
 const vr = true;
@@ -51,7 +51,7 @@ CreateBoxAsync(scene).then(function () {
     const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
     greenMaterial.diffuseColor = BABYLON.Color3.Green();
     greenSphere.material = greenMaterial;
-    
+
 //CreateSpheresAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF/Box.gltf").then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxTextured/glTF/BoxTextured.gltf").then(function () {
@@ -377,7 +377,7 @@ CreateBoxAsync(scene).then(function () {
                         {
                             images: [
                                 { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescentDishWithOlives/screenshot/screenshot_Large.jpg", estimatedRealWorldWidth: .2 },
-                                { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DragonAttenuation/screenshot/screenshot_large.png", estimatedRealWorldWidth: .2 },   
+                                { src: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DragonAttenuation/screenshot/screenshot_large.png", estimatedRealWorldWidth: .2 },
                         ]});
 
                     webXRImageTrackingModule.onTrackedImageUpdatedObservable.add((imageObject) => {
