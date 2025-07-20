@@ -150,7 +150,7 @@
     self.layerRenderer = layerRenderer;
     _isXrActive = YES;
     
-    NSLog(@"Setting up immersive mode with layer renderer: %p", layerRenderer);
+    NSLog(@"Setting up immersive mode with layer renderer: %p", (__bridge void*)layerRenderer);
     
     if (_nativeXr) {
         _nativeXr->UpdateWindow((__bridge void*)layerRenderer);

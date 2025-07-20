@@ -191,7 +191,7 @@ namespace xr {
             // Get the next frame from CompositorServices with error handling
             NSLog(@"Attempting to query next frame from layer renderer: %p", (__bridge void*)layerRenderer);
             cp_frame_t frame = cp_layer_renderer_query_next_frame(layerRenderer);
-            NSLog(@"Successfully queried frame: %p", (__bridge void*)frame);
+            NSLog(@"Successfully queried frame: %p", (void*)frame);
             SystemImpl.XrContext->Frame = frame;
 
             if (frame == nil) {
