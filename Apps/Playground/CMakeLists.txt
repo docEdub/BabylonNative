@@ -181,6 +181,7 @@ if(APPLE)
         set(CMAKE_Swift_LANGUAGE_VERSION 4.0)
         enable_language(Swift)
     elseif(VISIONOS)
+        set(RESOURCE_FILES ${RESOURCE_FILES} "${BABYLON_SCRIPTS}")
         set_target_properties(Playground PROPERTIES
             MACOSX_BUNDLE true
             MACOSX_BUNDLE_INFO_PLIST "${PLIST_FILE}"
@@ -223,7 +224,7 @@ if(WINDOWS_STORE)
     set_property(SOURCE ${SCRIPTS} ${BABYLON_SCRIPTS} ${DEPENDENCIES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
     set_property(SOURCE ${SCRIPTS} ${BABYLON_SCRIPTS} ${DEPENDENCIES} PROPERTY VS_DEPLOYMENT_LOCATION "Scripts")
         set_property(SOURCE ${REFERENCE_IMAGES} PROPERTY VS_DEPLOYMENT_LOCATION "ReferenceImages")
-else()
+elseif(NOT VISIONOS)
     foreach(SCRIPT ${SCRIPTS} ${BABYLON_SCRIPTS} ${DEPENDENCIES})
         get_filename_component(SCRIPT_NAME "${SCRIPT}" NAME)
         add_custom_command(
