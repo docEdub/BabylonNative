@@ -189,12 +189,13 @@ namespace xr {
             }
 
             // Get the next frame from CompositorServices with error handling
-            NSLog(@"Attempting to query next frame from layer renderer: %p", (__bridge void*)layerRenderer);
+            NSLog(@"GetNextFrame: Attempting to query next frame from layer renderer: %p", (__bridge void*)layerRenderer);
             cp_frame_t frame = cp_layer_renderer_query_next_frame(layerRenderer);
-            NSLog(@"Successfully queried frame: %p", (void*)frame);
+            NSLog(@"GetNextFrame: Successfully queried frame: %p", (void*)frame);
             SystemImpl.XrContext->Frame = frame;
 
             if (frame == nil) {
+                NSLog(@"GetNextFrame: Frame is nil, returning empty frame");
                 return std::make_unique<Frame>(*this);
             }
 
@@ -345,24 +346,46 @@ namespace xr {
             if (SystemImpl.XrContext->IsInitialized() && SystemImpl.XrContext->Frame != nil) {
                 cp_frame_t frame = SystemImpl.XrContext->Frame;
                 
-                NSLog(@"DrawFrame: Starting frame submission for frame: %p", (void*)frame);
+                NSLog(@"DrawFrame: Processing frame: %p", (void*)frame);
                 
                 cp_drawable_t drawable = cp_frame_query_drawable(frame);
                 if (drawable != nil) {
-                    NSLog(@"DrawFrame: Starting submission for drawable: %p", (void*)drawable);
-                    cp_frame_start_submission(frame);
+                    NSLog(@"DrawFrame: Found drawable: %p", (void*)drawable);
                     
-                    // NOTE: Actual rendering happens via bgfx in the main render loop
-                    // CompositorServices just needs the proper start/end submission calls
+                    // TODO: For now, skip CompositorServices submission to test continuous frame processing
+                    // This will allow us to verify that multiple frames can be queried without hanging
+                    NSLog(@"DrawFrame: Skipping submission for testing - checking continuous frame processing");
                     
-                    NSLog(@"DrawFrame: Ending submission for frame: %p", (void*)frame);
-                    cp_frame_end_submission(frame);
+                    // Perform minimal Metal rendering for visual verification
+                    id<MTLTexture> colorTexture = cp_drawable_get_color_texture(drawable, 0);
+                    if (colorTexture && commandQueue) {
+                        NSLog(@"DrawFrame: Performing minimal Metal clear operation");
+                        
+                        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+                        MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+                        renderPassDescriptor.colorAttachments[0].texture = colorTexture;
+                        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+                        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.8, 0.0, 1.0); // Bright green clear
+                        renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+                        
+                        id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+                        [renderEncoder endEncoding];
+                        
+                        [commandBuffer commit];
+                        [commandBuffer waitUntilCompleted];
+                        
+                        NSLog(@"DrawFrame: Metal clear operation completed");
+                    }
                 } else {
                     NSLog(@"DrawFrame: No drawable available for frame: %p", (void*)frame);
                 }
                 
-                // Clear the frame reference after submission
+                // Clear the frame reference to allow next frame query
                 SystemImpl.XrContext->Frame = nil;
+                NSLog(@"DrawFrame: Cleared frame reference, ready for next frame");
+            } else {
+                NSLog(@"DrawFrame: No frame available for processing (Frame: %p, Initialized: %d)", 
+                      (void*)SystemImpl.XrContext->Frame, SystemImpl.XrContext->IsInitialized());
             }
         }
 
