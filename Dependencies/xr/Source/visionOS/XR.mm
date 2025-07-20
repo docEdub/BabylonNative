@@ -212,6 +212,11 @@ namespace xr {
             if (colorTexture != nil) {
                 uint32_t width = (uint32_t)[colorTexture width];
                 uint32_t height = (uint32_t)[colorTexture height];
+                MTLPixelFormat pixelFormat = [colorTexture pixelFormat];
+                
+                // Log detailed texture information
+                NSLog(@"CompositorServices texture: %dx%d, format=%lu, usage=%lu, storageMode=%lu", 
+                      width, height, (unsigned long)pixelFormat, (unsigned long)[colorTexture usage], (unsigned long)[colorTexture storageMode]);
 
                 if (ActiveFrameViews[0].ColorTextureSize.Width != width || ActiveFrameViews[0].ColorTextureSize.Height != height) {
                     // Update color texture
@@ -226,7 +231,33 @@ namespace xr {
 
                         // Use the CompositorServices texture directly
                         ActiveFrameViews[0].ColorTexturePointer = (__bridge_retained void*)colorTexture;
-                        ActiveFrameViews[0].ColorTextureFormat = TextureFormat::BGRA8_SRGB;
+                        
+                        // Map Metal pixel format to our TextureFormat enum
+                        xr::TextureFormat textureFormat;
+                        switch (pixelFormat) {
+                            case MTLPixelFormatBGRA8Unorm:
+                                textureFormat = TextureFormat::BGRA8_SRGB;
+                                NSLog(@"Mapping MTLPixelFormatBGRA8Unorm to BGRA8_SRGB");
+                                break;
+                            case MTLPixelFormatBGRA8Unorm_sRGB:
+                                textureFormat = TextureFormat::BGRA8_SRGB;
+                                NSLog(@"Mapping MTLPixelFormatBGRA8Unorm_sRGB to BGRA8_SRGB");
+                                break;
+                            case MTLPixelFormatRGBA8Unorm:
+                                textureFormat = TextureFormat::RGBA8_SRGB;
+                                NSLog(@"Mapping MTLPixelFormatRGBA8Unorm to RGBA8_SRGB");
+                                break;
+                            case MTLPixelFormatRGBA8Unorm_sRGB:
+                                textureFormat = TextureFormat::RGBA8_SRGB;
+                                NSLog(@"Mapping MTLPixelFormatRGBA8Unorm_sRGB to RGBA8_SRGB");
+                                break;
+                            default:
+                                textureFormat = TextureFormat::BGRA8_SRGB; // fallback
+                                NSLog(@"Unknown pixel format %lu, using BGRA8_SRGB fallback", (unsigned long)pixelFormat);
+                                break;
+                        }
+                        
+                        ActiveFrameViews[0].ColorTextureFormat = textureFormat;
                         ActiveFrameViews[0].ColorTextureSize = {width, height};
                     }
 
@@ -240,13 +271,29 @@ namespace xr {
                             ActiveFrameViews[0].DepthTexturePointer = nil;
                         }
 
+                        // Use D32Float format on visionOS since D24S8 is not available
                         MTLTextureDescriptor *depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:width height:height mipmapped:NO];
                         depthDesc.usage = MTLTextureUsageRenderTarget;
                         depthDesc.storageMode = MTLStorageModePrivate;
                         id<MTLTexture> depthTexture = [metalDevice newTextureWithDescriptor:depthDesc];
+                        
+                        if (depthTexture == nil) {
+                            NSLog(@"Failed to create depth texture with D32Float format, falling back to D16");
+                            // Fallback to D16 if D32Float is not supported
+                            depthDesc.pixelFormat = MTLPixelFormatDepth16Unorm;
+                            depthTexture = [metalDevice newTextureWithDescriptor:depthDesc];
+                            ActiveFrameViews[0].DepthTextureFormat = TextureFormat::D16;
+                        } else {
+                            // Note: Using D24S8 enum even with D32Float Metal format for bgfx compatibility
+                            // This may need adjustment if bgfx strictly validates format matching
+                            ActiveFrameViews[0].DepthTextureFormat = TextureFormat::D24S8;
+                        }
+                        
                         ActiveFrameViews[0].DepthTexturePointer = (__bridge_retained void*)depthTexture;
-                        ActiveFrameViews[0].DepthTextureFormat = TextureFormat::D24S8;
                         ActiveFrameViews[0].DepthTextureSize = {width, height};
+                        
+                        NSLog(@"Created depth texture: %dx%d, format=%lu, actualFormat=%d", 
+                              width, height, (unsigned long)[depthTexture pixelFormat], (int)ActiveFrameViews[0].DepthTextureFormat);
                     }
                 }
 
@@ -296,18 +343,26 @@ namespace xr {
         void DrawFrame() {
             // Present the frame to CompositorServices
             if (SystemImpl.XrContext->IsInitialized() && SystemImpl.XrContext->Frame != nil) {
-                // cp_frame_t frame = SystemImpl.XrContext->Frame;
+                cp_frame_t frame = SystemImpl.XrContext->Frame;
                 
-                // Temporarily disable frame submission to test basic immersive mode
-                // TODO: Re-enable when we have proper rendering pipeline
-                /*
+                NSLog(@"DrawFrame: Starting frame submission for frame: %p", (void*)frame);
+                
                 cp_drawable_t drawable = cp_frame_query_drawable(frame);
                 if (drawable != nil) {
+                    NSLog(@"DrawFrame: Starting submission for drawable: %p", (void*)drawable);
                     cp_frame_start_submission(frame);
-                    // Rendering would happen here
+                    
+                    // NOTE: Actual rendering happens via bgfx in the main render loop
+                    // CompositorServices just needs the proper start/end submission calls
+                    
+                    NSLog(@"DrawFrame: Ending submission for frame: %p", (void*)frame);
                     cp_frame_end_submission(frame);
+                } else {
+                    NSLog(@"DrawFrame: No drawable available for frame: %p", (void*)frame);
                 }
-                */
+                
+                // Clear the frame reference after submission
+                SystemImpl.XrContext->Frame = nil;
             }
         }
 
