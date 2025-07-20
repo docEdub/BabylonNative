@@ -399,6 +399,16 @@ CreateBoxAsync(scene).then(function () {
                         xrSessionManager.scene.autoClear = true;
                         xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
                     }
+                    
+                    // Start WebXR render loop explicitly for visionOS
+                    console.log("Starting WebXR render loop...");
+                    function webXRRenderLoop(timestamp, frame) {
+                        if (xrSessionManager.scene) {
+                            xrSessionManager.scene.render();
+                        }
+                        xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
+                    }
+                    xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
                 });
             });
     }
