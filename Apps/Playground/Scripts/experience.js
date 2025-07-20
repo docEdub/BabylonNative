@@ -44,16 +44,17 @@ function CreateSpheresAsync(scene) {
 const engine = new BABYLON.NativeEngine();
 const scene = new BABYLON.Scene(engine);
 
-// Set clear color to blue for visibility testing
-scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
+// Set clear color to bright magenta for rendering pipeline testing
+scene.clearColor = new BABYLON.Color4(1, 0, 1, 1);
 
 CreateBoxAsync(scene).then(function () {
-    // Create a green sphere in the center for visionOS immersive-vr testing
-    const greenSphere = BABYLON.MeshBuilder.CreateSphere("greenSphere", {segments: 32, diameter: 0.5}, scene);
-    greenSphere.position = new BABYLON.Vector3(0, 0, 1);
-    const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
-    greenMaterial.diffuseColor = BABYLON.Color3.Green();
-    greenSphere.material = greenMaterial;
+    // Create minimal scene with single large red sphere at origin
+    const simpleSphere = BABYLON.MeshBuilder.CreateSphere("simpleSphere", {segments: 16, diameter: 2}, scene);
+    simpleSphere.position = new BABYLON.Vector3(0, 0, 0);
+    const redMaterial = new BABYLON.StandardMaterial("redMaterial", scene);
+    redMaterial.diffuseColor = BABYLON.Color3.Red();
+    redMaterial.emissiveColor = BABYLON.Color3.Red(); // Make it self-illuminated
+    simpleSphere.material = redMaterial;
 
 //CreateSpheresAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF/Box.gltf").then(function () {
@@ -74,9 +75,9 @@ CreateBoxAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/ClearCoatTest/glTF/ClearCoatTest.gltf").then(function () {
     BABYLON.Tools.Log("Loaded");
 
-    // This creates and positions a free camera (non-mesh)
-    scene.createDefaultCamera(true, true, true);
-    scene.activeCamera.alpha += Math.PI;
+    // Create simple camera looking at origin from close distance
+    const camera = new BABYLON.ArcRotateCamera("camera", 0, Math.PI / 2, 5, BABYLON.Vector3.Zero(), scene);
+    scene.activeCamera = camera;
 
     if (ibl) {
         scene.createDefaultEnvironment({ createGround: false, createSkybox: false });
@@ -409,25 +410,40 @@ CreateBoxAsync(scene).then(function () {
                         xrSessionManager.scene.autoClear = true;
                         xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
                     } else {
-                        // For visionOS, use blue clear color for visibility testing
+                        // For visionOS, use bright magenta clear color for rendering pipeline testing
                         xrSessionManager.scene.autoClear = true;
-                        xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
-                        console.log("Set visionOS XR scene clear color to blue");
+                        xrSessionManager.scene.clearColor = new BABYLON.Color4(1, 0, 1, 1);
+                        console.log("Set visionOS XR scene clear color to bright magenta");
                     }
                     
                     // Debug camera and scene information
                     console.log("XR Camera position:", xrSessionManager.scene.activeCamera.position.toString());
                     console.log("XR Camera target:", xrSessionManager.scene.activeCamera.getTarget().toString());
                     console.log("Scene meshes count:", xrSessionManager.scene.meshes.length);
-                    console.log("Green sphere position:", scene.getMeshByName("greenSphere")?.position.toString());
+                    console.log("Red sphere position:", scene.getMeshByName("simpleSphere")?.position.toString());
+                    console.log("Scene clear color:", scene.clearColor.toString());
                     
                     // Start WebXR render loop explicitly for visionOS
                     console.log("Starting WebXR render loop...");
                     function webXRRenderLoop(timestamp, frame) {
                         if (xrSessionManager.scene) {
-                            // Ensure clear color is applied every frame
-                            xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
+                            // Ensure bright magenta clear color is applied every frame for testing
+                            xrSessionManager.scene.clearColor = new BABYLON.Color4(1, 0, 1, 1);
+                            
+                            // Debug: Log render state every 60 frames (1 second at 60fps)
+                            if (frame && frame % 60 === 0) {
+                                console.log("RENDER DEBUG - Frame", frame, ":");
+                                console.log("  Scene.render() about to be called");
+                                console.log("  Clear color:", xrSessionManager.scene.clearColor.toString());
+                                console.log("  Active meshes:", xrSessionManager.scene.activeMeshes.length);
+                                console.log("  Ready meshes:", xrSessionManager.scene.meshes.filter(m => m.isReady()).length);
+                            }
+                            
                             xrSessionManager.scene.render();
+                            
+                            if (frame && frame % 60 === 0) {
+                                console.log("  Scene.render() completed");
+                            }
                         }
                         xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
                     }
