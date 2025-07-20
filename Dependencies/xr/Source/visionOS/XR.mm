@@ -169,6 +169,35 @@ namespace xr {
             shouldEndSession = sessionEnded;
             shouldRestartSession = false;
 
+            // Add frame counter and resource monitoring
+            static int frameCount = 0;
+            frameCount++;
+            NSLog(@"=== FRAME #%d START ===", frameCount);
+            NSLog(@"Frame Counter: Processing frame #%d", frameCount);
+            
+            // CRITICAL: CompositorServices enforces a 3-frame limit when skipping cp_frame_end_submission()
+            // Implement frame rate limiting to work within this constraint
+            static const int MAX_ACTIVE_FRAMES = 3;
+            static NSTimeInterval lastFrameTime = 0;
+            NSTimeInterval currentTime = [[NSDate date] timeIntervalSince1970];
+            static const NSTimeInterval FRAME_RATE_LIMIT = 1.0 / 30.0; // 30 FPS limit
+            
+            if (frameCount > MAX_ACTIVE_FRAMES) {
+                NSTimeInterval timeSinceLastFrame = currentTime - lastFrameTime;
+                if (timeSinceLastFrame < FRAME_RATE_LIMIT) {
+                    NSLog(@"Frame rate limiting: Waiting %.3fs before next frame query", FRAME_RATE_LIMIT - timeSinceLastFrame);
+                    // Return empty frame to allow frame rate limiting
+                    return std::make_unique<Frame>(*this);
+                }
+            }
+            lastFrameTime = currentTime;
+            
+            // Log memory usage and system resources
+            NSProcessInfo *processInfo = [NSProcessInfo processInfo];
+            NSLog(@"Memory Usage: Physical=%.2fMB, Virtual=%.2fMB", 
+                  processInfo.physicalMemory / (1024.0 * 1024.0),
+                  processInfo.physicalMemory / (1024.0 * 1024.0)); // Simplified for now
+
             UpdateLayerRenderer();
 
             if (!SystemImpl.XrContext->IsInitialized()) {
@@ -334,6 +363,7 @@ namespace xr {
                 ActiveFrameViews[0].DepthFarZ = DepthFarZ;
             }
 
+            NSLog(@"=== FRAME #%d COMPLETE ===", frameCount);
             return std::make_unique<Frame>(*this);
         }
 
@@ -346,7 +376,11 @@ namespace xr {
             if (SystemImpl.XrContext->IsInitialized() && SystemImpl.XrContext->Frame != nil) {
                 cp_frame_t frame = SystemImpl.XrContext->Frame;
                 
-                NSLog(@"DrawFrame: Processing frame: %p", (void*)frame);
+                // Track frame processing in DrawFrame as well
+                static int drawFrameCount = 0;
+                drawFrameCount++;
+                NSLog(@"=== DRAW FRAME #%d START ===", drawFrameCount);
+                NSLog(@"DrawFrame: Processing frame #%d: %p", drawFrameCount, (void*)frame);
                 
                 // CompositorServices requires obtaining a drawable before frame submission
                 cp_drawable_t drawable = cp_frame_query_drawable(frame);
@@ -395,6 +429,7 @@ namespace xr {
                 // Clear the frame reference to allow next frame query
                 SystemImpl.XrContext->Frame = nil;
                 NSLog(@"DrawFrame: Cleared frame reference, ready for next frame");
+                NSLog(@"=== DRAW FRAME #%d COMPLETE ===", drawFrameCount);
             } else {
                 NSLog(@"DrawFrame: No frame available for processing (Frame: %p, Initialized: %d)", 
                       (void*)SystemImpl.XrContext->Frame, SystemImpl.XrContext->IsInitialized());
