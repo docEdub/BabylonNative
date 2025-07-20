@@ -77,10 +77,10 @@
     Babylon::ScriptLoader loader{ *_runtime };
     loader.LoadScript("app:///Scripts/ammo.js");
     loader.LoadScript("app:///Scripts/recast.js");
-    loader.LoadScript("app:///Scripts/babylon.max.js");
-    loader.LoadScript("app:///Scripts/babylonjs.loaders.js");
-    loader.LoadScript("app:///Scripts/babylonjs.materials.js");
-    loader.LoadScript("app:///Scripts/babylon.gui.js");
+    loader.LoadScript("app:///babylon.max.js");
+    loader.LoadScript("app:///babylonjs.loaders.js");
+    loader.LoadScript("app:///babylonjs.materials.js");
+    loader.LoadScript("app:///babylon.gui.js");
     loader.LoadScript("app:///Scripts/experience.js");
     self.initialized = YES;
     
@@ -150,10 +150,13 @@
     self.layerRenderer = layerRenderer;
     _isXrActive = YES;
     
+    NSLog(@"Setting up immersive mode with layer renderer: %p", layerRenderer);
+    
     if (_nativeXr) {
         _nativeXr->UpdateWindow((__bridge void*)layerRenderer);
         _nativeXr->SetSessionStateChangedCallback([self](bool isSessionActive) {
             _isXrActive = isSessionActive;
+            NSLog(@"XR session state changed: %s", isSessionActive ? "active" : "inactive");
         });
     }
 }

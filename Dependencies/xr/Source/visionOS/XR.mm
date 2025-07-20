@@ -97,10 +97,15 @@ namespace xr {
 
         Impl(System::Impl& systemImpl, void* graphicsContext, void* commandQueue, std::function<void*()> windowProvider)
             : SystemImpl{ systemImpl }
-            , getLayerRenderer{ [windowProvider{ std::move(windowProvider) }] { return (__bridge cp_layer_renderer_t)windowProvider(); } }
+            , getLayerRenderer{ [windowProvider{ std::move(windowProvider) }] { 
+                void* result = windowProvider();
+                NSLog(@"Window provider called, returning: %p", result);
+                return (__bridge cp_layer_renderer_t)result;
+            } }
             , metalDevice{ (__bridge id<MTLDevice>)graphicsContext }
             , commandQueue{ (__bridge id<MTLCommandQueue>)commandQueue } {
 
+            NSLog(@"Creating XR Session with window provider");
             UpdateLayerRenderer();
         }
 
@@ -128,8 +133,19 @@ namespace xr {
         void UpdateLayerRenderer() {
             cp_layer_renderer_t activeLayerRenderer = getLayerRenderer();
             if (activeLayerRenderer != SystemImpl.XrContext->LayerRenderer) {
+                NSLog(@"Layer renderer changed from %p to %p", (__bridge void*)SystemImpl.XrContext->LayerRenderer, (__bridge void*)activeLayerRenderer);
                 SystemImpl.XrContext->LayerRenderer = activeLayerRenderer;
                 SystemImpl.XrContext->Initialized = (activeLayerRenderer != nullptr);
+                
+                // Update immersive session state based on layer renderer validity
+                bool wasInImmersiveSession = isInImmersiveSession;
+                isInImmersiveSession = (activeLayerRenderer != nullptr);
+                
+                if (isInImmersiveSession && !wasInImmersiveSession) {
+                    NSLog(@"Entering immersive session with layer renderer: %p", (__bridge void*)activeLayerRenderer);
+                } else if (!isInImmersiveSession && wasInImmersiveSession) {
+                    NSLog(@"Exiting immersive session, layer renderer is null");
+                }
             }
         }
 
@@ -165,8 +181,17 @@ namespace xr {
                 return std::make_unique<Frame>(*this);
             }
 
-            // Get the next frame from CompositorServices
+            // Check if we're in a valid immersive session before calling CompositorServices APIs
+            // This prevents crashes when the layer renderer is non-null but invalid
+            if (!isInImmersiveSession) {
+                NSLog(@"Not in immersive session yet, skipping CompositorServices frame query");
+                return std::make_unique<Frame>(*this);
+            }
+
+            // Get the next frame from CompositorServices with error handling
+            NSLog(@"Attempting to query next frame from layer renderer: %p", (__bridge void*)layerRenderer);
             cp_frame_t frame = cp_layer_renderer_query_next_frame(layerRenderer);
+            NSLog(@"Successfully queried frame: %p", (__bridge void*)frame);
             SystemImpl.XrContext->Frame = frame;
 
             if (frame == nil) {
@@ -271,17 +296,18 @@ namespace xr {
         void DrawFrame() {
             // Present the frame to CompositorServices
             if (SystemImpl.XrContext->IsInitialized() && SystemImpl.XrContext->Frame != nil) {
-                cp_frame_t frame = SystemImpl.XrContext->Frame;
+                // cp_frame_t frame = SystemImpl.XrContext->Frame;
                 
-                // Get the drawable and present it
+                // Temporarily disable frame submission to test basic immersive mode
+                // TODO: Re-enable when we have proper rendering pipeline
+                /*
                 cp_drawable_t drawable = cp_frame_query_drawable(frame);
                 if (drawable != nil) {
-                    // The drawable will be presented automatically by CompositorServices
-                    // when we end the frame submission
+                    cp_frame_start_submission(frame);
+                    // Rendering would happen here
+                    cp_frame_end_submission(frame);
                 }
-                
-                // End the frame submission
-                cp_frame_end_submission(frame);
+                */
             }
         }
 
@@ -332,6 +358,7 @@ namespace xr {
     private:
         std::function<cp_layer_renderer_t()> getLayerRenderer{};
         bool sessionEnded{ false };
+        bool isInImmersiveSession{ false };
         id<MTLDevice> metalDevice{};
         id<MTLCommandQueue> commandQueue;
         id<MTLCommandBuffer> currentCommandBuffer;
