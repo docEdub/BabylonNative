@@ -386,29 +386,18 @@ namespace xr {
                     cp_frame_start_submission(frame);
                     NSLog(@"DrawFrame: Started frame submission");
                     
-                    // Get the CompositorServices texture for rendering
+                    // Get the CompositorServices texture for rendering 
                     id<MTLTexture> colorTexture = cp_drawable_get_color_texture(drawable, 0);
-                    if (colorTexture && commandQueue) {
-                        NSLog(@"DrawFrame: Performing Metal render to CompositorServices texture");
+                    if (colorTexture) {
+                        NSLog(@"DrawFrame: CompositorServices texture available for bgfx rendering: %p", (__bridge void*)colorTexture);
+                        NSLog(@"DrawFrame: Texture size: %ldx%ld, format: %ld", 
+                              [colorTexture width], [colorTexture height], (long)[colorTexture pixelFormat]);
                         
-                        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-                        MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-                        renderPassDescriptor.colorAttachments[0].texture = colorTexture;
-                        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-                        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.8, 0.0, 1.0); // Bright green clear
-                        renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-                        
-                        id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-                        [renderEncoder endEncoding];
-                        
-                        // Submit and wait for completion
-                        [commandBuffer commit];
-                        [commandBuffer waitUntilCompleted];
-                        
-                        NSLog(@"DrawFrame: Metal rendering completed with status: %ld", (long)commandBuffer.status);
-                        if (commandBuffer.error) {
-                            NSLog(@"DrawFrame: Metal command buffer error: %@", commandBuffer.error.localizedDescription);
-                        }
+                        // NOTE: Removed manual Metal clear operation to allow bgfx/Babylon.js rendering
+                        // The bgfx system should now render the 3D scene directly to this CompositorServices texture
+                        // through the bgfx::overrideInternal() mechanism in NativeXr plugin
+                    } else {
+                        NSLog(@"DrawFrame: No CompositorServices texture available");
                     }
                     
                     // CRITICAL: cp_frame_end_submission() causes __BUG_IN_CLIENT__ crash
