@@ -44,10 +44,13 @@ function CreateSpheresAsync(scene) {
 const engine = new BABYLON.NativeEngine();
 const scene = new BABYLON.Scene(engine);
 
+// Set clear color to blue for visibility testing
+scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
+
 CreateBoxAsync(scene).then(function () {
     // Create a green sphere in the center for visionOS immersive-vr testing
     const greenSphere = BABYLON.MeshBuilder.CreateSphere("greenSphere", {segments: 32, diameter: 0.5}, scene);
-    greenSphere.position = new BABYLON.Vector3(0, 0, 2);
+    greenSphere.position = new BABYLON.Vector3(0, 0, 1);
     const greenMaterial = new BABYLON.StandardMaterial("greenMaterial", scene);
     greenMaterial.diffuseColor = BABYLON.Color3.Green();
     greenSphere.material = greenMaterial;
@@ -80,6 +83,13 @@ CreateBoxAsync(scene).then(function () {
     }
     else {
         scene.createDefaultLight(true);
+        
+        // Add additional lighting for better visibility in immersive mode
+        const hemisphericLight = new BABYLON.HemisphericLight("hemisphericLight", new BABYLON.Vector3(0, 1, 0), scene);
+        hemisphericLight.intensity = 0.8;
+        
+        const directionalLight = new BABYLON.DirectionalLight("directionalLight", new BABYLON.Vector3(0, -1, -1), scene);
+        directionalLight.intensity = 0.5;
     }
 
     if (cameraTexture) {
@@ -398,12 +408,25 @@ CreateBoxAsync(scene).then(function () {
                         // Pass through, head mounted displays (HoloLens 2) require autoClear and a black clear color
                         xrSessionManager.scene.autoClear = true;
                         xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+                    } else {
+                        // For visionOS, use blue clear color for visibility testing
+                        xrSessionManager.scene.autoClear = true;
+                        xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
+                        console.log("Set visionOS XR scene clear color to blue");
                     }
+                    
+                    // Debug camera and scene information
+                    console.log("XR Camera position:", xrSessionManager.scene.activeCamera.position.toString());
+                    console.log("XR Camera target:", xrSessionManager.scene.activeCamera.getTarget().toString());
+                    console.log("Scene meshes count:", xrSessionManager.scene.meshes.length);
+                    console.log("Green sphere position:", scene.getMeshByName("greenSphere")?.position.toString());
                     
                     // Start WebXR render loop explicitly for visionOS
                     console.log("Starting WebXR render loop...");
                     function webXRRenderLoop(timestamp, frame) {
                         if (xrSessionManager.scene) {
+                            // Ensure clear color is applied every frame
+                            xrSessionManager.scene.clearColor = new BABYLON.Color4(0, 0, 1, 1);
                             xrSessionManager.scene.render();
                         }
                         xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
