@@ -256,6 +256,10 @@ namespace xr {
                         // Use the CompositorServices texture directly
                         ActiveFrameViews[0].ColorTexturePointer = (__bridge_retained void*)colorTexture;
                         
+                        NSLog(@"TEXTURE OVERRIDE: Set ColorTexturePointer to CompositorServices texture: %p", 
+                              (__bridge void*)colorTexture);
+                        NSLog(@"TEXTURE OVERRIDE: ColorTexturePointer value: %p", ActiveFrameViews[0].ColorTexturePointer);
+                        
                         // Map Metal pixel format to our TextureFormat enum
                         xr::TextureFormat textureFormat;
                         switch (pixelFormat) {

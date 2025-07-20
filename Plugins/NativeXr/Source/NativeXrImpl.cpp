@@ -273,8 +273,12 @@ namespace Babylon
                     auto requiresAppClear = view.RequiresAppClear;
 
                     arcana::make_task(m_sessionState->GraphicsContext.AfterRenderScheduler(), arcana::cancellation::none(), [colorTexture, depthTexture, &viewConfig]() {
+                        NSLog(@"BGFX OVERRIDE: About to override bgfx textures with native pointers");
+                        NSLog(@"BGFX OVERRIDE: ColorTexturePointer = %p", viewConfig.ColorTexturePointer);
+                        NSLog(@"BGFX OVERRIDE: DepthTexturePointer = %p", viewConfig.DepthTexturePointer);
                         bgfx::overrideInternal(colorTexture, reinterpret_cast<uintptr_t>(viewConfig.ColorTexturePointer));
                         bgfx::overrideInternal(depthTexture, reinterpret_cast<uintptr_t>(viewConfig.DepthTexturePointer));
+                        NSLog(@"BGFX OVERRIDE: Successfully completed texture override");
                     }).then(m_runtimeScheduler, m_sessionState->CancellationSource, [this, thisRef{shared_from_this()}, colorTexture, depthTexture, requiresAppClear, &viewConfig]() {
                           const auto eyeCount = std::max(static_cast<uint16_t>(1), static_cast<uint16_t>(viewConfig.ViewTextureSize.Depth));
                           // TODO (rgerd): Remove old framebuffers from resource table?
