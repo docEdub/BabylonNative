@@ -352,14 +352,14 @@ namespace xr {
                 if (drawable != nil) {
                     NSLog(@"DrawFrame: Found drawable: %p", (void*)drawable);
                     
-                    // TODO: For now, skip CompositorServices submission to test continuous frame processing
-                    // This will allow us to verify that multiple frames can be queried without hanging
-                    NSLog(@"DrawFrame: Skipping submission for testing - checking continuous frame processing");
+                    // Perform proper CompositorServices frame submission
+                    cp_frame_start_submission(frame);
+                    NSLog(@"DrawFrame: Started frame submission");
                     
-                    // Perform minimal Metal rendering for visual verification
+                    // Perform Metal rendering to the CompositorServices texture
                     id<MTLTexture> colorTexture = cp_drawable_get_color_texture(drawable, 0);
                     if (colorTexture && commandQueue) {
-                        NSLog(@"DrawFrame: Performing minimal Metal clear operation");
+                        NSLog(@"DrawFrame: Performing Metal render to CompositorServices texture");
                         
                         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
                         MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -371,11 +371,18 @@ namespace xr {
                         id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
                         [renderEncoder endEncoding];
                         
+                        // Ensure the command buffer completes before ending submission
                         [commandBuffer commit];
                         [commandBuffer waitUntilCompleted];
                         
-                        NSLog(@"DrawFrame: Metal clear operation completed");
+                        NSLog(@"DrawFrame: Metal rendering completed");
                     }
+                    
+                    // End the frame submission - this should now work since we've done actual GPU work
+                    NSLog(@"DrawFrame: About to end frame submission");
+                    cp_frame_end_submission(frame);
+                    NSLog(@"DrawFrame: Frame submission completed successfully!");
+                    
                 } else {
                     NSLog(@"DrawFrame: No drawable available for frame: %p", (void*)frame);
                 }
