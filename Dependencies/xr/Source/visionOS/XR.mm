@@ -176,21 +176,15 @@ namespace xr {
             NSLog(@"Frame Counter: Processing frame #%d", frameCount);
             
             // CRITICAL: CompositorServices enforces a 3-frame limit when skipping cp_frame_end_submission()
-            // Implement frame rate limiting to work within this constraint
-            static const int MAX_ACTIVE_FRAMES = 3;
-            static NSTimeInterval lastFrameTime = 0;
-            NSTimeInterval currentTime = [[NSDate date] timeIntervalSince1970];
-            static const NSTimeInterval FRAME_RATE_LIMIT = 1.0 / 30.0; // 30 FPS limit
+            // After processing 3 frames, we must completely stop querying new frames to avoid crash
+            static const int MAX_SAFE_FRAMES = 3;
             
-            if (frameCount > MAX_ACTIVE_FRAMES) {
-                NSTimeInterval timeSinceLastFrame = currentTime - lastFrameTime;
-                if (timeSinceLastFrame < FRAME_RATE_LIMIT) {
-                    NSLog(@"Frame rate limiting: Waiting %.3fs before next frame query", FRAME_RATE_LIMIT - timeSinceLastFrame);
-                    // Return empty frame to allow frame rate limiting
-                    return std::make_unique<Frame>(*this);
-                }
+            if (frameCount > MAX_SAFE_FRAMES) {
+                NSLog(@"SAFETY: Reached max safe frames (%d), stopping frame queries to prevent CompositorServices crash", MAX_SAFE_FRAMES);
+                NSLog(@"This prevents the __BUG_IN_CLIENT__ crash from cp_layer_renderer_query_next_frame()");
+                // Return empty frame - no more CompositorServices queries
+                return std::make_unique<Frame>(*this);
             }
-            lastFrameTime = currentTime;
             
             // Log memory usage and system resources
             NSProcessInfo *processInfo = [NSProcessInfo processInfo];
@@ -301,8 +295,9 @@ namespace xr {
                             ActiveFrameViews[0].DepthTexturePointer = nil;
                         }
 
-                        // Use D32Float format on visionOS since D24S8 is not available
-                        MTLTextureDescriptor *depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float width:width height:height mipmapped:NO];
+                        // Use D32Float_S8 format on visionOS to support both depth and stencil operations
+                        // MTLPixelFormatDepth32Float_Stencil8 supports both depth and stencil rendering
+                        MTLTextureDescriptor *depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8 width:width height:height mipmapped:NO];
                         depthDesc.usage = MTLTextureUsageRenderTarget;
                         depthDesc.storageMode = MTLStorageModePrivate;
                         id<MTLTexture> depthTexture = [metalDevice newTextureWithDescriptor:depthDesc];
@@ -322,7 +317,7 @@ namespace xr {
                         ActiveFrameViews[0].DepthTexturePointer = (__bridge_retained void*)depthTexture;
                         ActiveFrameViews[0].DepthTextureSize = {width, height};
                         
-                        NSLog(@"Created depth texture: %dx%d, format=%lu, actualFormat=%d", 
+                        NSLog(@"Created depth-stencil texture: %dx%d, format=%lu (MTLPixelFormatDepth32Float_Stencil8), actualFormat=%d", 
                               width, height, (unsigned long)[depthTexture pixelFormat], (int)ActiveFrameViews[0].DepthTextureFormat);
                     }
                 }
