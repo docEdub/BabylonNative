@@ -414,6 +414,26 @@ CreateBoxAsync(scene).then(function () {
                         xrSessionManager.scene.autoClear = true;
                         xrSessionManager.scene.clearColor = new BABYLON.Color4(1, 0, 1, 1);
                         console.log("Set visionOS XR scene clear color to bright magenta");
+                        
+                        // CRITICAL: Copy all objects from main scene to XR scene
+                        console.log("Copying scene content to XR scene...");
+                        console.log("Main scene meshes:", scene.meshes.length);
+                        console.log("XR scene meshes before copy:", xrSessionManager.scene.meshes.length);
+                        
+                        // Copy all meshes from main scene to XR scene
+                        scene.meshes.forEach((mesh, index) => {
+                            console.log(`Copying mesh ${index}: ${mesh.name}`);
+                            mesh.setParent(null); // Remove from main scene
+                            xrSessionManager.scene.addMesh(mesh); // Add to XR scene
+                        });
+                        
+                        // Copy lights
+                        scene.lights.forEach((light, index) => {
+                            console.log(`Copying light ${index}: ${light.name}`);
+                            xrSessionManager.scene.addLight(light);
+                        });
+                        
+                        console.log("XR scene meshes after copy:", xrSessionManager.scene.meshes.length);
                     }
                     
                     // Debug camera and scene information
@@ -422,32 +442,12 @@ CreateBoxAsync(scene).then(function () {
                     console.log("Scene meshes count:", xrSessionManager.scene.meshes.length);
                     console.log("Red sphere position:", scene.getMeshByName("simpleSphere")?.position.toString());
                     console.log("Scene clear color:", scene.clearColor.toString());
+                    console.log("XR render target:", xr.renderTarget);
+                    console.log("XR session:", xrSessionManager.session);
+                    console.log("XR session active:", xrSessionManager.session.renderState.baseLayer);
                     
-                    // Start WebXR render loop explicitly for visionOS
-                    console.log("Starting WebXR render loop...");
-                    function webXRRenderLoop(timestamp, frame) {
-                        if (xrSessionManager.scene) {
-                            // Ensure bright magenta clear color is applied every frame for testing
-                            xrSessionManager.scene.clearColor = new BABYLON.Color4(1, 0, 1, 1);
-                            
-                            // Debug: Log render state every 60 frames (1 second at 60fps)
-                            if (frame && frame % 60 === 0) {
-                                console.log("RENDER DEBUG - Frame", frame, ":");
-                                console.log("  Scene.render() about to be called");
-                                console.log("  Clear color:", xrSessionManager.scene.clearColor.toString());
-                                console.log("  Active meshes:", xrSessionManager.scene.activeMeshes.length);
-                                console.log("  Ready meshes:", xrSessionManager.scene.meshes.filter(m => m.isReady()).length);
-                            }
-                            
-                            xrSessionManager.scene.render();
-                            
-                            if (frame && frame % 60 === 0) {
-                                console.log("  Scene.render() completed");
-                            }
-                        }
-                        xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
-                    }
-                    xrSessionManager.session.requestAnimationFrame(webXRRenderLoop);
+                    // Let Babylon.js handle WebXR rendering automatically
+                    console.log("WebXR session established, Babylon.js will handle rendering");
                 });
             });
     }
