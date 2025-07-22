@@ -286,7 +286,12 @@ protected:
 
         StartRenderingNextFrame();
 
-        runtime.emplace();
+        Babylon::AppRuntime::Options options{};
+        options.UnhandledExceptionHandler = [](const Napi::Error& error) {
+            std::cerr << "[Uncaught Error] " << error.Get("stack").As<Napi::String>().Utf8Value() << std::endl;
+            std::cerr.flush();
+        };
+        runtime.emplace(options);
 
         InitializeBabylonServices();
         DispatchBindings();
