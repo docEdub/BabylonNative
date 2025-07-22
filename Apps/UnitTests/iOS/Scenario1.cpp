@@ -211,6 +211,7 @@ namespace
                           Napi::Persistent(externalTexture.AddToContextAsync(env)));
 
                       dispatch_async(dispatch_get_main_queue(), ^{
+                        // NB: AddToContextAsync won't resolve until the next frame render, so we need to ensure we render a frame.
                         RenderFrame();
                         runtime->Dispatch([deferred, addToContextPromise = std::move(addToContextPromise)](Napi::Env env) {
                             deferred.Resolve(addToContextPromise->Value());
@@ -256,31 +257,16 @@ namespace
                 return deferred.Promise();
             }));
 
-            // env.Global().Set("renderFrame", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
-            //     [self updateTotalFrameDuration];
-            //     Napi::Promise::Deferred deferred{info.Env()};
-            //     dispatch_async(dispatch_get_main_queue(), ^{
-            //       [self renderFrame];
-            //       runtime->Dispatch([deferred](Napi::Env env) {
-            //           deferred.Resolve(env.Undefined());
-            //       });
-            //     });
-            //     return deferred.Promise();
-            // }));
-
-            // env.Global().Set("readFont", Napi::Function::New(env, [self](const Napi::CallbackInfo& info) {
-            //     std::string assetId = info[0].As<Napi::String>().Utf8Value();
-            //     NSData* data = [_delegate loadFontData:[NSString stringWithCString:assetId.c_str() encoding:NSUTF8StringEncoding]];
-            //     if (data != nil)
-            //     {
-            //         NSUInteger length = [data length];
-
-            //         Napi::ArrayBuffer buffer = Napi::ArrayBuffer::New(info.Env(), length);
-            //         [data getBytes:buffer.Data() length:length];
-            //         return buffer;
-            //     }
-            //     return Napi::ArrayBuffer::New(info.Env(), 0);
-            // }));
+            env.Global().Set("renderFrame", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+                Napi::Promise::Deferred deferred{info.Env()};
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  RenderFrame();
+                  runtime->Dispatch([deferred](Napi::Env env) {
+                      deferred.Resolve(env.Undefined());
+                  });
+                });
+                return deferred.Promise();
+            }));
         });
     }
 }
