@@ -310,6 +310,7 @@ TEST(DISABLED_Performance, ShaderCache)
     }
     {
         std::ifstream file(shaderCacheFileName, std::ios::binary);
+        // NB: This call takes a very long time to run in iOS simulator.
         auto deserializedCount = Babylon::ShaderCache::Deserialize(file);
         EXPECT_EQ(deserializedCount, shaderCount);
     }
