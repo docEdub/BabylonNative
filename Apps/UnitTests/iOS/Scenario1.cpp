@@ -308,6 +308,7 @@ TEST(Scenario1, Init)
     Babylon::ScriptLoader loader{*runtime};
     // loader.LoadScript("app:///Superfill/superfillCompositor.js");
 
+    // Cache function references for later use.
     // NSString *errorPtr = nil;
     // loader.Dispatch([completion, errorPtr](Napi::Env env) {
     //     seek = Napi::Persistent(env.Global().Get("seek").As<Napi::Function>());
@@ -316,6 +317,15 @@ TEST(Scenario1, Init)
     //     updateItem = Napi::Persistent(env.Global().Get("updateItem").As<Napi::Function>());
     //     completion(errorPtr);
     // });
+
+    // Wait for initialization to complete before deinitializing.
+    std::promise<void> done;
+    runtime->Dispatch([&done](Napi::Env env) {
+        done.set_value();
+    });
+    done.get_future().get();
+
+    Deinitialize();
 
     EXPECT_EQ(0, 0);
 }
