@@ -35,6 +35,8 @@ const char* EnumToString(Babylon::Polyfills::Console::LogLevel logLevel)
     return "unknown";
 }
 
+// TODO: Re-enable these tests.
+
 TEST(DISABLED_JavaScript, All)
 {
     // Change this to true to wait for the JavaScript debugger to attach (only applies to V8)
