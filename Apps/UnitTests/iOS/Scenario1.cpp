@@ -271,47 +271,52 @@ namespace
     }
 }
 
-TEST(Scenario1, Init)
+class Scenario1Test : public ::testing::Test
 {
-    auto mtlDevice = MTLCreateSystemDefaultDevice();
+protected:
+    void SetUp() override
+    {
+        auto mtlDevice = MTLCreateSystemDefaultDevice();
 
-    Babylon::Graphics::Configuration config{};
-    config.Device = mtlDevice;
-    // config.Window = view; // TODO: Is this needed? If yest then it needs to be an MTKView*.
-    // config.Width = static_cast<size_t>(width);
-    // config.Height = static_cast<size_t>(height);
-    device.emplace(config);
+        Babylon::Graphics::Configuration config{};
+        config.Device = mtlDevice;
+        device.emplace(config);
 
-    deviceUpdate.emplace(device->GetUpdate("update"));
+        deviceUpdate.emplace(device->GetUpdate("update"));
 
-    StartRenderingNextFrame();
+        StartRenderingNextFrame();
 
-    runtime.emplace();
+        runtime.emplace();
 
-    InitializeBabylonServices();
-    DispatchBindings();
+        InitializeBabylonServices();
+        DispatchBindings();
+    }
 
+    void TearDown() override
+    {
+        Deinitialize();
+    }
+};
+
+TEST_F(Scenario1Test, Init)
+{
     Babylon::ScriptLoader loader{*runtime};
     // loader.LoadScript("app:///Superfill/superfillCompositor.js");
 
     // Cache function references for later use.
-    // NSString *errorPtr = nil;
     // loader.Dispatch([completion, errorPtr](Napi::Env env) {
     //     seek = Napi::Persistent(env.Global().Get("seek").As<Napi::Function>());
     //     loadProject = Napi::Persistent(env.Global().Get("loadProject").As<Napi::Function>());
     //     updateItemTransform = Napi::Persistent(env.Global().Get("updateTrackItemTransform").As<Napi::Function>());
     //     updateItem = Napi::Persistent(env.Global().Get("updateItem").As<Napi::Function>());
-    //     completion(errorPtr);
     // });
 
-    // Wait for initialization to complete before deinitializing.
+    // Wait for tests to complete before deinitializing.
     std::promise<void> done;
     runtime->Dispatch([&done](Napi::Env env) {
         done.set_value();
     });
     done.get_future().get();
-
-    Deinitialize();
 
     EXPECT_EQ(0, 0);
 }
