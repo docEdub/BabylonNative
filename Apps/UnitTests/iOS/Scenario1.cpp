@@ -14,11 +14,74 @@
 
 #include <CoreMedia/CMTime.h>
 
-namespace
+class Scenario1Test : public ::testing::Test
 {
+protected:
+    void SetUp() override
+    {
+        auto mtlDevice = MTLCreateSystemDefaultDevice();
+
+        Babylon::Graphics::Configuration config{};
+        config.Device = mtlDevice;
+        device.emplace(config);
+
+        deviceUpdate.emplace(device->GetUpdate("update"));
+
+        StartRenderingNextFrame();
+
+        Babylon::AppRuntime::Options options{};
+        options.UnhandledExceptionHandler = [](const Napi::Error& error) {
+            std::cerr << "[Uncaught Error] " << error.Get("stack").As<Napi::String>().Utf8Value() << std::endl;
+            std::cerr.flush();
+        };
+        runtime.emplace(options);
+
+        InitializeBabylonServices();
+        DispatchBindings();
+
+        loader.emplace(*runtime);
+        loader->LoadScript("app:///Scripts/babylon.max.js");
+        loader->LoadScript("app:///Scripts/babylonjs.materials.js");
+    }
+
+    void TearDown() override
+    {
+        Deinitialize();
+    }
+
+    void Eval(std::string script)
+    {
+        readyPromise = std::promise<int32_t>();
+
+        loader->Eval(std::move(script), "code");
+        loader->Eval(R"(setReady();)", "setReady");
+
+        readyPromise.get_future().get();
+    }
+
+    void RenderFrame()
+    {
+        assert([NSThread isMainThread]);
+        FinishRenderingCurrentFrame();
+        StartRenderingNextFrame();
+    }
+
+    void WaitForRuntimeToFinish()
+    {
+        std::promise<void> done;
+        runtime->Dispatch([&done](Napi::Env env) {
+            done.set_value();
+        });
+        done.get_future().wait();
+    }
+
+private:
     std::optional<Babylon::Graphics::Device> device{};
     std::optional<Babylon::Graphics::DeviceUpdate> deviceUpdate{};
     std::optional<Babylon::AppRuntime> runtime{};
+    std::optional<Babylon::ScriptLoader> loader{};
+
+    std::promise<int32_t> readyPromise{};
 
     bool isExporting = false;
     bool hasStartedRenderingFrame = false;
@@ -96,16 +159,9 @@ namespace
         hasStartedRenderingFrame = false;
     }
 
-    void RenderFrame()
-    {
-        assert([NSThread isMainThread]);
-        FinishRenderingCurrentFrame();
-        StartRenderingNextFrame();
-    }
-
     void InitializeBabylonServices()
     {
-        runtime->Dispatch([](Napi::Env env) {
+        runtime->Dispatch([this](Napi::Env env) {
             device->AddToJavaScript(env);
 
             auto platformInfo = device->GetPlatformInfo();
@@ -132,6 +188,7 @@ namespace
 
         sourceTextures.clear();
 
+        loader.reset();
         runtime.reset();
         deviceUpdate.reset();
         device.reset();
@@ -186,10 +243,10 @@ namespace
             return Babylon::Plugins::ExternalTexture{texture};
         };
 
-        runtime->Dispatch([loadTexture = std::move(loadTexture)](Napi::Env env) {
+        runtime->Dispatch([this, loadTexture = std::move(loadTexture)](Napi::Env env) {
             // MARK: - Source APIs
 
-            env.Global().Set("createSource", Napi::Function::New(env, [loadTexture = std::move(loadTexture)](const Napi::CallbackInfo& info) {
+            env.Global().Set("createSource", Napi::Function::New(env, [this, loadTexture = std::move(loadTexture)](const Napi::CallbackInfo& info) {
                 int sourceId = info[0].As<Napi::Number>().Int32Value();
                 std::string assetId = info[1].As<Napi::String>().Utf8Value();
 
@@ -205,7 +262,7 @@ namespace
                   // Ensure the insert succeeded. This will fail if there was already a value in the map matching the sourceId
                   assert(insertResult.second);
 
-                  runtime->Dispatch([deferred, externalTexture = std::move(externalTexture)](Napi::Env env) {
+                  runtime->Dispatch([this, deferred, externalTexture = std::move(externalTexture)](Napi::Env env) {
                       // We need to ensure we persist the AddToContextAsync promise
                       auto addToContextPromise = std::make_shared<Napi::Reference<Napi::Promise>>(
                           Napi::Persistent(externalTexture.AddToContextAsync(env)));
@@ -223,11 +280,11 @@ namespace
                 return deferred.Promise();
             }));
 
-            env.Global().Set("destroySource", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+            env.Global().Set("destroySource", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 int sourceId = info[0].As<Napi::Number>().Int32Value();
 
                 // The source texture can only be removed between frame renders, so we queue the removal for the next available render.
-                pendingTextureRemovalQueue.queueAction([sourceId]() {
+                pendingTextureRemovalQueue.queueAction([this, sourceId]() {
                     if (sourceTextures.find(sourceId) != sourceTextures.end())
                     {
                         sourceTextures.erase(sourceId);
@@ -237,12 +294,12 @@ namespace
 
             // MARK: - Export APIs
 
-            env.Global().Set("writeFrame", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+            env.Global().Set("writeFrame", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 Napi::Promise::Deferred deferred{info.Env()};
                 double timeInMs = info[0].As<Napi::Number>().DoubleValue();
                 CMTime frameTime = CMTimeMakeWithSeconds(timeInMs / 1000.0, 300);
-                WriteFrame(frameTime, std::function<void(bool)>([deferred](bool isFinished) {
-                    runtime->Dispatch([deferred, isFinished = std::move(isFinished)](Napi::Env env) {
+                WriteFrame(frameTime, std::function<void(bool)>([this, deferred](bool isFinished) {
+                    runtime->Dispatch([this, deferred, isFinished = std::move(isFinished)](Napi::Env env) {
                         deferred.Resolve(Napi::Boolean::New(env, isFinished));
 
                         if (isFinished)
@@ -257,7 +314,7 @@ namespace
                 return deferred.Promise();
             }));
 
-            env.Global().Set("renderFrame", Napi::Function::New(env, [](const Napi::CallbackInfo& info) {
+            env.Global().Set("renderFrame", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 Napi::Promise::Deferred deferred{info.Env()};
                 dispatch_async(dispatch_get_main_queue(), ^{
                   RenderFrame();
@@ -267,61 +324,59 @@ namespace
                 });
                 return deferred.Promise();
             }));
+
+            env.Global().Set("setReady", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
+                Napi::Env env = info.Env();
+                this->readyPromise.set_value(1);
+            }));
         });
-    }
-}
-
-class Scenario1Test : public ::testing::Test
-{
-protected:
-    void SetUp() override
-    {
-        auto mtlDevice = MTLCreateSystemDefaultDevice();
-
-        Babylon::Graphics::Configuration config{};
-        config.Device = mtlDevice;
-        device.emplace(config);
-
-        deviceUpdate.emplace(device->GetUpdate("update"));
-
-        StartRenderingNextFrame();
-
-        Babylon::AppRuntime::Options options{};
-        options.UnhandledExceptionHandler = [](const Napi::Error& error) {
-            std::cerr << "[Uncaught Error] " << error.Get("stack").As<Napi::String>().Utf8Value() << std::endl;
-            std::cerr.flush();
-        };
-        runtime.emplace(options);
-
-        InitializeBabylonServices();
-        DispatchBindings();
-    }
-
-    void TearDown() override
-    {
-        Deinitialize();
     }
 };
 
 TEST_F(Scenario1Test, Init)
 {
-    Babylon::ScriptLoader loader{*runtime};
-    // loader.LoadScript("app:///Superfill/superfillCompositor.js");
+    Eval(R"(
+        console.log("Setting up Performance test.");
+        var engine = new BABYLON.NativeEngine();
+        var scene = new BABYLON.Scene(engine);
 
-    // Cache function references for later use.
-    // loader.Dispatch([completion, errorPtr](Napi::Env env) {
-    //     seek = Napi::Persistent(env.Global().Get("seek").As<Napi::Function>());
-    //     loadProject = Napi::Persistent(env.Global().Get("loadProject").As<Napi::Function>());
-    //     updateItemTransform = Napi::Persistent(env.Global().Get("updateTrackItemTransform").As<Napi::Function>());
-    //     updateItem = Napi::Persistent(env.Global().Get("updateItem").As<Napi::Function>());
-    // });
+        var size = 12;
+        for (var i = 0; i < size; i++) {
+            for (var j = 0; j < size; j++) {
+                for (var k = 0; k < size; k++) {
+                    var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
+                    sphere.position.x = i;
+                    sphere.position.y = j;
+                    sphere.position.z = k;
+                }
+            }
+        }
 
-    // Wait for tests to complete before deinitializing.
-    std::promise<void> done;
-    runtime->Dispatch([&done](Napi::Env env) {
-        done.set_value();
-    });
-    done.get_future().get();
+        scene.createDefaultCamera(true, true, true);
+        scene.activeCamera.alpha += Math.PI;
+        scene.createDefaultLight(true);
+        engine.runRenderLoop(function () {
+            console.log("Rendering frame.");
+            scene.render();
+        });
+        console.log("Ready!");
+    )");
+
+    const auto start = std::chrono::high_resolution_clock::now();
+
+    for (int frame = 0; frame < 100; frame++)
+    {
+        RenderFrame();
+    }
+
+    // Stop measuring time
+    const auto stop = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    const float durationSeconds = float(duration.count()) / 1000.f;
+    std::cout << "Duration is " << durationSeconds << " seconds. " << std::endl;
+    std::cout.flush();
+
+    WaitForRuntimeToFinish();
 
     EXPECT_EQ(0, 0);
 }
