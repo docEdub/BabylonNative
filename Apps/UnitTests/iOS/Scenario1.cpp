@@ -14,6 +14,31 @@
 
 #include <CoreMedia/CMTime.h>
 
+@interface EmptyViewWrapper : NSObject
+@property(strong, nonatomic) MTKView* emptyView;
+@end
+
+@implementation EmptyViewWrapper
+@synthesize emptyView;
+
+- (instancetype)init
+{
+    // This is a workaround to avoid creating a MTKView instance when running unit tests.
+    // This is necessary because the MTKView initializer hangs in XCode 16 and prevents the unit tests from running.
+    // This hang doesn't happend when running the actual application, only the test suite.
+    if (!NSClassFromString(@"XCTest"))
+    {
+        emptyView = [[MTKView alloc] init];
+    }
+    return self;
+}
+@end
+
+namespace
+{
+    static auto emptyViewWrapper = [[EmptyViewWrapper alloc] init];
+}
+
 class Scenario1Test : public ::testing::Test
 {
 protected:
@@ -23,6 +48,9 @@ protected:
 
         Babylon::Graphics::Configuration config{};
         config.Device = mtlDevice;
+        config.Window = emptyViewWrapper.emptyView;
+        config.Width = 1024;
+        config.Height = 1024;
         device.emplace(config);
 
         deviceUpdate.emplace(device->GetUpdate("update"));
@@ -49,14 +77,17 @@ protected:
         Deinitialize();
     }
 
-    void Eval(std::string script)
+    void Eval(std::string script, bool isAsync = false)
     {
         readyPromise = std::promise<int32_t>();
 
         loader->Eval(std::move(script), "code");
-        loader->Eval(R"(setReady();)", "setReady");
 
-        readyPromise.get_future().get();
+        if (!isAsync)
+        {
+            loader->Eval(R"(setReady();)", "setReady");
+            readyPromise.get_future().get();
+        }
     }
 
     void RenderFrame()
@@ -64,6 +95,11 @@ protected:
         assert([NSThread isMainThread]);
         FinishRenderingCurrentFrame();
         StartRenderingNextFrame();
+    }
+
+    void WaitForReadyPromise()
+    {
+        readyPromise.get_future().get();
     }
 
     void WaitForRuntimeToFinish()
@@ -232,14 +268,20 @@ private:
     {
         auto loadTexture = [device = (__bridge id<MTLDevice>)device->GetPlatformInfo().Device]() {
             MTKTextureLoader* loader = [[MTKTextureLoader alloc] initWithDevice:device];
-            // NSString* filename = @"sample_image";
-            // NSString* extension = @"jpg";
-            NSURL* url = [[NSBundle mainBundle] URLForResource:@"sample_image" withExtension:@"jpg"];
+            NSString* filename = @"Checker_albedo_128x128";
+            NSString* extension = @"jpg";
+            NSURL* url = [[NSBundle mainBundle] URLForResource:filename withExtension:extension];
+            NSError* error = nil;
             id<MTLTexture> texture = [loader newTextureWithContentsOfURL:url
                                                                  options:@{
                                                                      MTKTextureLoaderOptionSRGB : @NO,
                                                                  }
-                                                                   error:nil];
+                                                                   error:&error];
+            if (error != nil)
+            {
+                NSLog(@"MTKTextureLoader error loading texture %@.%@: %@", filename, extension, error.localizedDescription);
+            }
+
             return Babylon::Plugins::ExternalTexture{texture};
         };
 
@@ -248,7 +290,6 @@ private:
 
             env.Global().Set("createSource", Napi::Function::New(env, [this, loadTexture = std::move(loadTexture)](const Napi::CallbackInfo& info) {
                 int sourceId = info[0].As<Napi::Number>().Int32Value();
-                std::string assetId = info[1].As<Napi::String>().Utf8Value();
 
                 Napi::Promise::Deferred deferred{info.Env()};
 
@@ -336,38 +377,51 @@ private:
 TEST_F(Scenario1Test, Init)
 {
     Eval(R"(
-        console.log("Setting up Performance test.");
-        var engine = new BABYLON.NativeEngine();
-        var scene = new BABYLON.Scene(engine);
+            console.log("Setting up Performance test.");
+            var engine = new BABYLON.NativeEngine();
+            var scene = new BABYLON.Scene(engine);
 
-        var size = 12;
-        for (var i = 0; i < size; i++) {
-            for (var j = 0; j < size; j++) {
-                for (var k = 0; k < size; k++) {
-                    var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
-                    sphere.position.x = i;
-                    sphere.position.y = j;
-                    sphere.position.z = k;
+            var size = 12;
+            for (var i = 0; i < size; i++) {
+                for (var j = 0; j < size; j++) {
+                    for (var k = 0; k < size; k++) {
+                        var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
+                        sphere.position.x = i;
+                        sphere.position.y = j;
+                        sphere.position.z = k;
+                    }
                 }
             }
-        }
 
-        scene.createDefaultCamera(true, true, true);
-        scene.activeCamera.alpha += Math.PI;
-        scene.createDefaultLight(true);
-        engine.runRenderLoop(function () {
-            console.log("Rendering frame.");
-            scene.render();
-        });
-        console.log("Ready!");
-    )");
+            scene.createDefaultCamera(true, true, true);
+            scene.activeCamera.alpha += Math.PI;
+            scene.createDefaultLight(true);
+            engine.runRenderLoop(function () {
+                console.log("Rendering frame.");
+                scene.render();
+            });
+
+            console.log("Creating source texture ...");
+
+            createSource(0).then((texture) => {
+                console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
+                setReady();
+            });
+
+            console.log("Ready!");
+        )",
+        true);
 
     const auto start = std::chrono::high_resolution_clock::now();
 
     for (int frame = 0; frame < 100; frame++)
     {
+        // Is this not the main thread?
+        dispatch_main();
         RenderFrame();
     }
+
+    WaitForReadyPromise();
 
     // Stop measuring time
     const auto stop = std::chrono::high_resolution_clock::now();

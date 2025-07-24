@@ -12,6 +12,10 @@ set(EXTERNAL_SCRIPTS
     "../node_modules/chai/chai.umd.js"
     "../node_modules/mocha/mocha.umd.js")
 
+set(TEXTURES
+    "Textures/Checker_albedo_128x128.jpg"
+    "Textures/Checker_albedo.jpg")
+
 set(SOURCES
     "Shared/Shared.h"
     "Shared/Shared.cpp")
@@ -36,7 +40,7 @@ elseif(WIN32)
     set(SOURCES ${SOURCES} "Win32/App.cpp")
 endif()
 
-add_executable(UnitTests ${SCRIPTS} ${EXTERNAL_SCRIPTS} ${SOURCES})
+add_executable(UnitTests ${SCRIPTS} ${EXTERNAL_SCRIPTS} ${SOURCES} ${TEXTURES})
 set_property(TARGET UnitTests PROPERTY UNITY_BUILD false)
 
 target_link_libraries(UnitTests
@@ -63,7 +67,7 @@ if(IOS)
     set_target_properties(UnitTests PROPERTIES
         MACOSX_BUNDLE true
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/iOS/Info.plist"
-        RESOURCE "${SCRIPTS};${EXTERNAL_SCRIPTS}"
+        RESOURCE "${SCRIPTS};${EXTERNAL_SCRIPTS};${TEXTURES}"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "18.0"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.BabylonNative.UnitTests.iOS")
 else()
