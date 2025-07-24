@@ -97,6 +97,11 @@ protected:
         StartRenderingNextFrame();
     }
 
+    bool IsReady()
+    {
+        return isReady;
+    }
+
     void WaitForReadyPromise()
     {
         readyPromise.get_future().get();
@@ -120,6 +125,7 @@ private:
     std::promise<int32_t> readyPromise{};
 
     bool isExporting = false;
+    std::atomic<bool> isReady = false;
     bool hasStartedRenderingFrame = false;
 
     std::unordered_map<long, Babylon::Plugins::ExternalTexture> sourceTextures;
@@ -369,6 +375,7 @@ private:
             env.Global().Set("setReady", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 Napi::Env env = info.Env();
                 this->readyPromise.set_value(1);
+                this->isReady = true;
             }));
         });
     }
@@ -412,27 +419,15 @@ TEST_F(Scenario1Test, Init)
         )",
         true);
 
-    const auto start = std::chrono::high_resolution_clock::now();
-
-    // for (int frame = 0; frame < 100; frame++)
-    while (true)
+    while (!IsReady())
     {
         // Process pending blocks on the main queue.
         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
-
-        RenderFrame();
     }
 
-    WaitForReadyPromise();
-
-    // Stop measuring time
-    const auto stop = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    const float durationSeconds = float(duration.count()) / 1000.f;
-    std::cout << "Duration is " << durationSeconds << " seconds. " << std::endl;
-    std::cout.flush();
-
     WaitForRuntimeToFinish();
+
+    // Timers are firing after the runtime is "finished" and crashing the runtime's work queue. How do we handle this?
 
     EXPECT_EQ(0, 0);
 }
