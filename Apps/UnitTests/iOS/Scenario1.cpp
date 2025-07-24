@@ -414,10 +414,12 @@ TEST_F(Scenario1Test, Init)
 
     const auto start = std::chrono::high_resolution_clock::now();
 
-    for (int frame = 0; frame < 100; frame++)
+    // for (int frame = 0; frame < 100; frame++)
+    while (true)
     {
-        // Is this not the main thread?
-        dispatch_main();
+        // Process pending blocks on the main queue.
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
+
         RenderFrame();
     }
 
