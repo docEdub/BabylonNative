@@ -77,17 +77,19 @@ protected:
         Deinitialize();
     }
 
-    void Eval(std::string script, bool isAsync = false)
+    void Eval(std::string script)
     {
-        readyPromise = std::promise<int32_t>();
-
         loader->Eval(std::move(script), "code");
+    }
 
-        if (!isAsync)
-        {
-            loader->Eval(R"(setReady();)", "setReady");
-            readyPromise.get_future().get();
-        }
+    bool IsReady()
+    {
+        return isReady;
+    }
+
+    void SetReady(bool value)
+    {
+        isReady = value;
     }
 
     void RenderFrame()
@@ -97,23 +99,13 @@ protected:
         StartRenderingNextFrame();
     }
 
-    bool IsReady()
+    void RunUntilReady()
     {
-        return isReady;
-    }
-
-    void WaitForReadyPromise()
-    {
-        readyPromise.get_future().get();
-    }
-
-    void WaitForRuntimeToFinish()
-    {
-        std::promise<void> done;
-        runtime->Dispatch([&done](Napi::Env env) {
-            done.set_value();
-        });
-        done.get_future().wait();
+        while (!IsReady())
+        {
+            // Process pending blocks on the main queue.
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
+        }
     }
 
 private:
@@ -121,8 +113,6 @@ private:
     std::optional<Babylon::Graphics::DeviceUpdate> deviceUpdate{};
     std::optional<Babylon::AppRuntime> runtime{};
     std::optional<Babylon::ScriptLoader> loader{};
-
-    std::promise<int32_t> readyPromise{};
 
     bool isExporting = false;
     std::atomic<bool> isReady = false;
@@ -374,7 +364,6 @@ private:
 
             env.Global().Set("setReady", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 Napi::Env env = info.Env();
-                this->readyPromise.set_value(1);
                 this->isReady = true;
             }));
         });
@@ -383,51 +372,57 @@ private:
 
 TEST_F(Scenario1Test, Init)
 {
-    Eval(R"(
-            console.log("Setting up Performance test.");
-            var engine = new BABYLON.NativeEngine();
-            var scene = new BABYLON.Scene(engine);
+    const auto script = R"(
+        console.log("Setting up Performance test.");
+        var engine = new BABYLON.NativeEngine();
+        var scene = new BABYLON.Scene(engine);
 
-            var size = 12;
-            for (var i = 0; i < size; i++) {
-                for (var j = 0; j < size; j++) {
-                    for (var k = 0; k < size; k++) {
-                        var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
-                        sphere.position.x = i;
-                        sphere.position.y = j;
-                        sphere.position.z = k;
-                    }
+        var size = 12;
+        for (var i = 0; i < size; i++) {
+            for (var j = 0; j < size; j++) {
+                for (var k = 0; k < size; k++) {
+                    var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
+                    sphere.position.x = i;
+                    sphere.position.y = j;
+                    sphere.position.z = k;
                 }
             }
+        }
 
-            scene.createDefaultCamera(true, true, true);
-            scene.activeCamera.alpha += Math.PI;
-            scene.createDefaultLight(true);
-            engine.runRenderLoop(function () {
-                console.log("Rendering frame.");
-                scene.render();
-            });
+        scene.createDefaultCamera(true, true, true);
+        scene.activeCamera.alpha += Math.PI;
+        scene.createDefaultLight(true);
+        engine.runRenderLoop(function () {
+            console.log("Rendering frame.");
+            scene.render();
+        });
 
-            console.log("Creating source texture ...");
+        console.log("Creating source texture ...");
 
-            createSource(0).then((texture) => {
-                console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
-                setReady();
-            });
+        createSource(0).then((texture) => {
+            console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
+            console.log("typeof texture: " + typeof texture);
+            setReady();
+        });
 
-            console.log("Ready!");
-        )",
-        true);
+        console.log("Ready!");
 
-    while (!IsReady())
-    {
-        // Process pending blocks on the main queue.
-        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
-    }
+        const shutdown = () => {
+            console.log("Shutting down ...");
+            engine.stopRenderLoop();
+            scene.dispose();
+            engine.dispose();
+            setReady();
+        };
+    )";
 
-    WaitForRuntimeToFinish();
+    SetReady(false);
+    Eval(script);
+    RunUntilReady();
 
-    // Timers are firing after the runtime is "finished" and crashing the runtime's work queue. How do we handle this?
+    SetReady(false);
+    Eval(R"(shutdown();)");
+    RunUntilReady();
 
     EXPECT_EQ(0, 0);
 }
