@@ -74,41 +74,75 @@ protected:
 
     void TearDown() override
     {
+        std::promise<void> done;
+        runtime->Dispatch([&done](Napi::Env env) {
+            done.set_value();
+        });
+        done.get_future().wait();
+
         Deinitialize();
+
+        std::cerr.flush();
+        std::cout.flush();
     }
 
-    void Eval(std::string script)
+    void Eval(std::string script, const std::string& name = "code")
     {
-        loader->Eval(std::move(script), "code");
+        isReady = false;
+        loader->Eval(std::move(script), name);
+        RunUntilReady();
     }
 
-    bool IsReady()
+    void EvalStartupScript()
     {
-        return isReady;
+        Eval(startupScript, "startup");
     }
 
-    void SetReady(bool value)
+    void EvalShutdownScript()
     {
-        isReady = value;
+        Eval(shutdownScript, "shutdown");
     }
 
-    void RenderFrame()
+    size_t GetSourceTextureCount() const
     {
-        assert([NSThread isMainThread]);
-        FinishRenderingCurrentFrame();
-        StartRenderingNextFrame();
-    }
-
-    void RunUntilReady()
-    {
-        while (!IsReady())
-        {
-            // Process pending blocks on the main queue.
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
-        }
+        return sourceTextures.size();
     }
 
 private:
+    std::string startupScript{R"(
+        var engine = new BABYLON.NativeEngine();
+        var scene = new BABYLON.Scene(engine);
+
+        scene.createDefaultCamera(true, true, true);
+
+        engine.runRenderLoop(function () {
+            console.log("Rendering frame ...");
+
+            scene.render();
+
+            console.log("Rendering frame - done");
+        });
+
+        const shutdown = () => {
+            console.log("Shutting down ...");
+
+            engine.stopRenderLoop();
+
+            scene.dispose();
+            engine.dispose();
+
+            console.log("Shutting down - done");
+
+            setReady(true);
+        };
+
+        setReady(true);
+    )"};
+
+    std::string shutdownScript{R"(
+        shutdown();
+    )"};
+
     std::optional<Babylon::Graphics::Device> device{};
     std::optional<Babylon::Graphics::DeviceUpdate> deviceUpdate{};
     std::optional<Babylon::AppRuntime> runtime{};
@@ -135,6 +169,13 @@ private:
     {
         assert([NSThread isMainThread]);
         pendingTextureRemovalQueue.performQueuedActions();
+    }
+
+    void RenderFrame()
+    {
+        assert([NSThread isMainThread]);
+        FinishRenderingCurrentFrame();
+        StartRenderingNextFrame();
     }
 
     void StartRenderingNextFrame()
@@ -226,6 +267,15 @@ private:
         device.reset();
     }
 
+    void RunUntilReady()
+    {
+        while (!isReady)
+        {
+            // Process pending blocks on the main queue.
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
+        }
+    }
+
     void WriteFrame(CMTime frameTime, std::function<void(bool)> completionHandler)
     {
         assert([NSThread isMainThread]);
@@ -269,8 +319,7 @@ private:
             NSURL* url = [[NSBundle mainBundle] URLForResource:filename withExtension:extension];
             NSError* error = nil;
             id<MTLTexture> texture = [loader newTextureWithContentsOfURL:url
-                                                                 options:@{
-                                                                     MTKTextureLoaderOptionSRGB : @NO,
+                                                                 options:@{MTKTextureLoaderOptionSRGB : @NO,
                                                                  }
                                                                    error:&error];
             if (error != nil)
@@ -363,66 +412,89 @@ private:
             }));
 
             env.Global().Set("setReady", Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
-                Napi::Env env = info.Env();
-                this->isReady = true;
+                bool ready = info[0].As<Napi::Boolean>().Value();
+                this->isReady = ready;
             }));
         });
     }
 };
 
-TEST_F(Scenario1Test, Init)
+TEST_F(Scenario1Test, StartupAndShutdown)
 {
-    const auto script = R"(
-        console.log("Setting up Performance test.");
-        var engine = new BABYLON.NativeEngine();
-        var scene = new BABYLON.Scene(engine);
+    EvalStartupScript();
+    EvalShutdownScript();
+}
 
-        var size = 12;
-        for (var i = 0; i < size; i++) {
-            for (var j = 0; j < size; j++) {
-                for (var k = 0; k < size; k++) {
-                    var sphere = BABYLON.Mesh.CreateSphere("sphere" + i + j + k, 32, 0.9, scene);
-                    sphere.position.x = i;
-                    sphere.position.y = j;
-                    sphere.position.z = k;
-                }
-            }
-        }
+TEST_F(Scenario1Test, CreateSourceTexture)
+{
+    EvalStartupScript();
 
-        scene.createDefaultCamera(true, true, true);
-        scene.activeCamera.alpha += Math.PI;
-        scene.createDefaultLight(true);
-        engine.runRenderLoop(function () {
-            console.log("Rendering frame.");
-            scene.render();
-        });
-
+    Eval(R"(
         console.log("Creating source texture ...");
 
         createSource(0).then((texture) => {
+            // TODO: Is there a way to make sure the texture is a valid external texture?
             console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
-            console.log("typeof texture: " + typeof texture);
-            setReady();
+            console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
+
+            setReady(true);
         });
+    )");
 
-        console.log("Ready!");
+    EXPECT_EQ(GetSourceTextureCount(), 1);
 
-        const shutdown = () => {
-            console.log("Shutting down ...");
-            engine.stopRenderLoop();
-            scene.dispose();
-            engine.dispose();
-            setReady();
-        };
-    )";
+    EvalShutdownScript();
+}
 
-    SetReady(false);
-    Eval(script);
-    RunUntilReady();
+TEST_F(Scenario1Test, DestroySourceTexture)
+{
+    EvalStartupScript();
 
-    SetReady(false);
-    Eval(R"(shutdown();)");
-    RunUntilReady();
+    Eval(R"(
+        console.log("Creating source texture ...");
 
-    EXPECT_EQ(0, 0);
+        createSource(0).then((texture) => {
+            // TODO: Is there a way to make sure the texture is a valid external texture?
+            console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
+            console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
+
+            setReady(true);
+        });
+    )");
+
+    Eval(R"(
+        console.log("Destroying source texture ...");
+
+        destroySource(0);
+
+        // Sources are removed between `StartRenderingCurrentFrame()` and `FinishRenderingCurrentFrame`, so we need to
+        // render a frame to ensure the texture is removed.
+        renderFrame().then(() => {
+            console.log("Destroying source texture - done");
+            setReady(true);
+        });
+    )");
+
+    EXPECT_EQ(GetSourceTextureCount(), 0);
+
+    EvalShutdownScript();
+}
+
+TEST_F(Scenario1Test, WriteFrameToExportTexture)
+{
+    EvalStartupScript();
+
+    Eval(R"(
+        console.log("Creating source texture ...");
+
+        createSource(0).then((texture) => {
+            // TODO: Is there a way to make sure the texture is a valid external texture?
+            console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
+            console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
+
+            setReady(true);
+        });
+    )");
+
+    EvalShutdownScript();
 }
