@@ -110,6 +110,8 @@ protected:
 
 private:
     std::string startupScript{R"(
+        console.log("Starting up ...");
+
         var engine = new BABYLON.NativeEngine();
         var scene = new BABYLON.Scene(engine);
 
@@ -124,23 +126,22 @@ private:
         });
 
         const shutdown = () => {
-            console.log("Shutting down ...");
-
             engine.stopRenderLoop();
-
             scene.dispose();
             engine.dispose();
-
-            console.log("Shutting down - done");
-
-            setReady(true);
         };
 
+        console.log("Starting up - done");
         setReady(true);
     )"};
 
     std::string shutdownScript{R"(
+        console.log("Shutting down ...");
+
         shutdown();
+
+        console.log("Shutting down - done");
+        setReady(true);
     )"};
 
     std::optional<Babylon::Graphics::Device> device{};
@@ -458,6 +459,7 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
             console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
 
+            console.log("Creating source texture - done");
             setReady(true);
         });
     )");
@@ -467,8 +469,8 @@ TEST_F(Scenario1Test, DestroySourceTexture)
 
         destroySource(0);
 
-        // Sources are removed between `StartRenderingCurrentFrame()` and `FinishRenderingCurrentFrame`, so we need to
-        // render a frame to ensure the texture is removed.
+        // Sources are removed between `FinishRenderingCurrentFrame()` and `StartRenderingCurrentFrame`, so we need to
+        // render a frame to finalize removing the texture.
         renderFrame().then(() => {
             console.log("Destroying source texture - done");
             setReady(true);
@@ -492,6 +494,7 @@ TEST_F(Scenario1Test, WriteFrameToExportTexture)
             console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
             console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
 
+            console.log("Creating source texture - done");
             setReady(true);
         });
     )");
