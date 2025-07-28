@@ -13,4 +13,4 @@ endif()
 
 add_subdirectory(IntegrationTestApp)
 
-npm(install --silent)
+npm(install --silent --yes)
