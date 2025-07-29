@@ -109,6 +109,7 @@ private:
 
     std::optional<Babylon::Plugins::ExternalTexture> exportTexture{};
 
+    // TODO: Maybe use arcana's thread safe queue, instead (blocking concurrent queue - doesn't have to block).
     void PerformQueuedUpdateActions()
     {
         assert([NSThread isMainThread]);
@@ -239,6 +240,7 @@ private:
         isExporting = true;
 
         // TODO: Compare the exported frame to an expected result.
+        // Use same image comparison code as playground validation/visualization tests.
         // See clipchamp-mobile PlayerViewModel.swift:499.
         completionHandler(true);
     }
