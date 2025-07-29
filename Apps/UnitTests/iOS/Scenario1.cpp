@@ -74,12 +74,6 @@ protected:
 
     void TearDown() override
     {
-        std::promise<void> done;
-        runtime->Dispatch([&done](Napi::Env env) {
-            done.set_value();
-        });
-        done.get_future().wait();
-
         Deinitialize();
 
         std::cerr.flush();
