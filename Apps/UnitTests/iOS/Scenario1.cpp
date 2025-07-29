@@ -93,57 +93,12 @@ protected:
         RunUntilReady();
     }
 
-    void EvalStartupScript()
-    {
-        Eval(startupScript, "startup");
-    }
-
-    void EvalShutdownScript()
-    {
-        Eval(shutdownScript, "shutdown");
-    }
-
     size_t GetSourceTextureCount() const
     {
         return sourceTextures.size();
     }
 
 private:
-    std::string startupScript{R"(
-        console.log("Starting up ...");
-
-        var engine = new BABYLON.NativeEngine();
-        var scene = new BABYLON.Scene(engine);
-
-        scene.createDefaultCamera(true, true, true);
-
-        engine.runRenderLoop(function () {
-            console.log("Rendering frame ...");
-
-            scene.render();
-
-            console.log("Rendering frame - done");
-        });
-
-        const shutdown = () => {
-            engine.stopRenderLoop();
-            scene.dispose();
-            engine.dispose();
-        };
-
-        console.log("Starting up - done");
-        setReady(true);
-    )"};
-
-    std::string shutdownScript{R"(
-        console.log("Shutting down ...");
-
-        shutdown();
-
-        console.log("Shutting down - done");
-        setReady(true);
-    )"};
-
     std::optional<Babylon::Graphics::Device> device{};
     std::optional<Babylon::Graphics::DeviceUpdate> deviceUpdate{};
     std::optional<Babylon::AppRuntime> runtime{};
@@ -289,8 +244,9 @@ private:
 
         isExporting = true;
 
-        // TODO: Write the frame to a file?
+        // TODO: Compare the exported frame to an expected result.
         // See clipchamp-mobile PlayerViewModel.swift:499.
+        completionHandler(true);
     }
 
     void StartExporting(id<MTLTexture> texture, std::function<void(bool)> completionHandler)
@@ -385,18 +341,21 @@ private:
                 Napi::Promise::Deferred deferred{info.Env()};
                 double timeInMs = info[0].As<Napi::Number>().DoubleValue();
                 CMTime frameTime = CMTimeMakeWithSeconds(timeInMs / 1000.0, 300);
-                WriteFrame(frameTime, std::function<void(bool)>([this, deferred](bool isFinished) {
-                    runtime->Dispatch([this, deferred, isFinished = std::move(isFinished)](Napi::Env env) {
-                        deferred.Resolve(Napi::Boolean::New(env, isFinished));
 
-                        if (isFinished)
-                        {
-                            dispatch_async(dispatch_get_main_queue(), ^{
-                              exportTexture.reset();
-                            });
-                        }
-                    });
-                }));
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  WriteFrame(frameTime, std::function<void(bool)>([this, deferred](bool isFinished) {
+                      runtime->Dispatch([this, deferred, isFinished = std::move(isFinished)](Napi::Env env) {
+                          deferred.Resolve(Napi::Boolean::New(env, isFinished));
+
+                          if (isFinished)
+                          {
+                              dispatch_async(dispatch_get_main_queue(), ^{
+                                exportTexture.reset();
+                              });
+                          }
+                      });
+                  }));
+                });
 
                 return deferred.Promise();
             }));
@@ -420,38 +379,44 @@ private:
     }
 };
 
-TEST_F(Scenario1Test, StartupAndShutdown)
+namespace
 {
-    EvalStartupScript();
-    EvalShutdownScript();
-}
+    const std::string StartupScript{R"(
+        console.log("Starting up ...");
 
-TEST_F(Scenario1Test, CreateSourceTexture)
-{
-    EvalStartupScript();
+        var engine = new BABYLON.NativeEngine();
+        var scene = new BABYLON.Scene(engine);
 
-    Eval(R"(
-        console.log("Creating source texture ...");
+        scene.createDefaultCamera(true, true, true);
 
-        createSource(0).then((texture) => {
-            // TODO: Is there a way to make sure the texture is a valid external texture?
-            console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
-            console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
+        engine.runRenderLoop(function () {
+            console.log("Rendering frame ...");
 
-            setReady(true);
+            scene.render();
+
+            console.log("Rendering frame - done");
         });
-    )");
 
-    EXPECT_EQ(GetSourceTextureCount(), 1);
+        const shutdown = () => {
+            engine.stopRenderLoop();
+            scene.dispose();
+            engine.dispose();
+        };
 
-    EvalShutdownScript();
-}
+        console.log("Starting up - done");
+        setReady(true);
+    )"};
 
-TEST_F(Scenario1Test, DestroySourceTexture)
-{
-    EvalStartupScript();
+    const std::string ShutdownScript{R"(
+        console.log("Shutting down ...");
 
-    Eval(R"(
+        shutdown();
+
+        console.log("Shutting down - done");
+        setReady(true);
+    )"};
+
+    const std::string CreateSourceScript{R"(
         console.log("Creating source texture ...");
 
         createSource(0).then((texture) => {
@@ -462,7 +427,29 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             console.log("Creating source texture - done");
             setReady(true);
         });
-    )");
+    )"};
+}
+
+TEST_F(Scenario1Test, StartupAndShutdown)
+{
+    Eval(StartupScript, "StartupScript");
+    Eval(ShutdownScript, "ShutdownScript");
+}
+
+TEST_F(Scenario1Test, CreateSourceTexture)
+{
+    Eval(StartupScript, "StartupScript");
+    Eval(CreateSourceScript, "CreateSourceScript");
+
+    EXPECT_EQ(GetSourceTextureCount(), 1);
+
+    Eval(ShutdownScript, "ShutdownScript");
+}
+
+TEST_F(Scenario1Test, DestroySourceTexture)
+{
+    Eval(StartupScript, "StartupScript");
+    Eval(CreateSourceScript, "CreateSourceScript");
 
     Eval(R"(
         console.log("Destroying source texture ...");
@@ -479,25 +466,22 @@ TEST_F(Scenario1Test, DestroySourceTexture)
 
     EXPECT_EQ(GetSourceTextureCount(), 0);
 
-    EvalShutdownScript();
+    Eval(ShutdownScript, "ShutdownScript");
 }
 
 TEST_F(Scenario1Test, WriteFrameToExportTexture)
 {
-    EvalStartupScript();
+    Eval(StartupScript, "StartupScript");
+    Eval(CreateSourceScript, "CreateSourceScript");
 
     Eval(R"(
-        console.log("Creating source texture ...");
+        console.log("Writing frame ...");
 
-        createSource(0).then((texture) => {
-            // TODO: Is there a way to make sure the texture is a valid external texture?
-            console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
-            console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
-
-            console.log("Creating source texture - done");
+        writeFrame(0).then((isFinished) => {
+            console.log("Writing frame - done: `isFinished` = " + isFinished);
             setReady(true);
         });
     )");
 
-    EvalShutdownScript();
+    Eval(ShutdownScript, "ShutdownScript");
 }
