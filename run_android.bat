@@ -155,7 +155,7 @@ echo Logs will be saved to android_logs.txt
 echo ========================================
 
 :: Create logs directory if it doesn't exist
-if not exist "logs" mkdir logs
+if not exist ".logs" mkdir .logs
 
 :: Generate timestamp for log filename
 for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
@@ -164,7 +164,7 @@ set "HH=%dt:~8,2%" & set "Min=%dt:~10,2%" & set "Sec=%dt:~12,2%"
 set "datestamp=%YYYY%-%MM%-%DD%_%HH%-%Min%-%Sec%"
 
 :: Start logcat with tee-like functionality using PowerShell (foreground)
-set "LOG_FILE=logs\android_logs_%datestamp%.txt"
+set "LOG_FILE=.logs\android_logs_%datestamp%.log"
 echo Logging to: %LOG_FILE%
 
 echo.
@@ -181,6 +181,20 @@ echo.
 echo.
 
 :quit_app
+echo Capturing final screenshot...
+"%ADB_PATH%" shell screencap -p /sdcard/babylon_final_screenshot.png
+if not errorlevel 1 (
+    "%ADB_PATH%" pull /sdcard/babylon_final_screenshot.png ".logs\android_logs_%datestamp%.png"
+    if not errorlevel 1 (
+        echo Screenshot saved to: .logs\android_logs_%datestamp%.png
+        "%ADB_PATH%" shell rm /sdcard/babylon_final_screenshot.png
+    ) else (
+        echo Warning: Failed to pull screenshot from device
+    )
+) else (
+    echo Warning: Failed to capture screenshot
+)
+
 echo Stopping the Playground app on device...
 "%ADB_PATH%" shell am force-stop com.android.babylonnative.playground
 

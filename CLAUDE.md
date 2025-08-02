@@ -10,8 +10,16 @@ Working on adding WebXR support to the Android Playground app for BabylonNative.
 - `run_android.bat` - Deploys and runs the app on the connected Meta Quest 3
 
 ### Logging
-- Output from `run_android.bat` is saved to the `log` folder
+- Output from `run_android.bat` is saved to the `.logs` folder
 - Check logs for debugging WebXR functionality and device interactions
+- Screenshots are automatically captured when the app is stopped (Ctrl+C)
+- Screenshots show the Meta Quest 3's stereoscopic display with both left and right eye views at an angle
+- These angled dual-eye screenshots can be used to verify if the app successfully entered WebXR immersive mode
+- Screenshot files use the same naming as log files: `.logs\android_logs_YYYY-MM-DD_HH-MM-SS.png`
+
+### Screenshot Examples
+- **Non-immersive (Windowed) View**: See `.example-screenshots/example-windowed-view.png` - shows a single centered window view instead of a fully immersed WebXR view, with the angled left and right eye displays side by side.
+- **Immersive WebXR View**: When successfully entering WebXR immersive mode, the screenshot will show the angled left and right eye displays side by side
 
 ### Testing Device
 - **Device**: Meta Quest 3
@@ -40,17 +48,4 @@ Working on adding WebXR support to the Android Playground app for BabylonNative.
 - `babylonjs.materials.js`
 - `babylon.gui.js`
 
-But these files exist only in `node_modules` and need to be copied to the Scripts directory.
-
-**Solution**: Run `copy_babylon_scripts.bat` from the project root to copy the required files:
-```bash
-copy_babylon_scripts.bat
-```
-
-**Files copied**:
-- `Apps/node_modules/babylonjs/babylon.max.js` → `Apps/Playground/Scripts/babylon.max.js`
-- `Apps/node_modules/babylonjs-loaders/babylonjs.loaders.js` → `Apps/Playground/Scripts/babylonjs.loaders.js`
-- `Apps/node_modules/babylonjs-materials/babylonjs.materials.js` → `Apps/Playground/Scripts/babylonjs.materials.js`
-- `Apps/node_modules/babylonjs-gui/babylon.gui.js` → `Apps/Playground/Scripts/babylon.gui.js`
-
-**Prevention**: After running `npm install` in the Apps directory, always run `copy_babylon_scripts.bat` to ensure the files are in the correct location.
+But these files exist only in `node_modules` and need to be copied to the Scripts directory. Do this in the CLI without creating a script to copy the files.
