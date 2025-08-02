@@ -99,9 +99,9 @@ for /f "tokens=*" %%i in ('"%ADB_PATH%" shell pm path com.android.babylonnative.
 )
 set "DEVICE_APK_PATH=%DEVICE_APK_PATH:package:=%"
 
-:: Generate hash of local APK
+:: Generate hash of local APK (convert to lowercase to match device output)
 echo Generating hash of local APK...
-for /f %%i in ('powershell -Command "Get-FileHash '%APK_PATH%' -Algorithm SHA256 | Select-Object -ExpandProperty Hash"') do set "LOCAL_HASH=%%i"
+for /f %%i in ('powershell -Command "(Get-FileHash '%APK_PATH%' -Algorithm SHA256).Hash.ToLower()"') do set "LOCAL_HASH=%%i"
 
 :: Generate hash of device APK
 echo Generating hash of device APK...
