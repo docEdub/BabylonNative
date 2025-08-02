@@ -3,9 +3,17 @@ setlocal enabledelayedexpansion
 
 cls
 
+:: Check for --auto argument
+set "AUTO_MODE=0"
+if "%1"=="--auto" set "AUTO_MODE=1"
+
 echo ========================================
 echo  BabylonNative Android Playground Runner
 echo ========================================
+if "%AUTO_MODE%"=="1" (
+    echo  Running in AUTO MODE - will quit after 10 seconds
+    echo ========================================
+)
 
 :: Check if local.properties exists to get Android SDK path
 if not exist "Apps\Playground\Android\local.properties" (
@@ -150,7 +158,11 @@ echo ========================================
 
 :: Show logs and save to file
 echo.
-echo Starting logcat... Press Ctrl+C to stop.
+if "%AUTO_MODE%"=="1" (
+    echo Starting logcat for 10 seconds in auto mode...
+) else (
+    echo Starting logcat... Press Ctrl+C to stop.
+)
 echo Logs will be saved to android_logs.txt
 echo ========================================
 
@@ -169,13 +181,28 @@ echo Logging to: %LOG_FILE%
 
 echo.
 echo ========================================
-echo  App is running. Logs are being captured.
-echo  Press Ctrl+C to quit the app and stop logging.
+if "%AUTO_MODE%"=="1" (
+    echo  App is running. Logs are being captured for 10 seconds.
+    echo  Will automatically quit and take screenshot.
+) else (
+    echo  App is running. Logs are being captured.
+    echo  Press Ctrl+C to quit the app and stop logging.
+)
 echo ========================================
 echo.
 
 :: Start logcat with tee functionality to show in terminal and save to file
-call "%ADB_PATH%" logcat -s BabylonNative | powershell -Command "$input | Tee-Object -FilePath '%LOG_FILE%'" 2>nul
+if "%AUTO_MODE%"=="1" (
+    :: In auto mode, run logcat for 10 seconds then automatically quit
+    timeout /t 1 /nobreak >nul
+    start /b cmd /c ""%ADB_PATH%" logcat -s BabylonNative > "%LOG_FILE%" 2>nul"
+    echo Waiting 10 seconds for app to initialize and run...
+    timeout /t 10 /nobreak >nul
+    echo 10 seconds elapsed - stopping logcat and taking screenshot...
+    taskkill /f /im "adb.exe" /fi "CommandLine eq *logcat*" >nul 2>&1
+) else (
+    call "%ADB_PATH%" logcat -s BabylonNative | powershell -Command "$input | Tee-Object -FilePath '%LOG_FILE%'" 2>nul
+)
 
 echo.
 echo.
@@ -200,6 +227,16 @@ echo Stopping the Playground app on device...
 
 echo Cleaning up any remaining processes...
 taskkill /f /im "adb.exe" /fi "CommandLine eq *logcat*" >nul 2>&1
+
+if "%AUTO_MODE%"=="1" (
+    echo.
+    echo ========================================
+    echo  Captured log contents:
+    echo ========================================
+    type "%LOG_FILE%"
+    echo.
+    echo ========================================
+)
 
 echo.
 echo ========================================
