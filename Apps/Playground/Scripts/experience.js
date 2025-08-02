@@ -5,10 +5,10 @@
 
 const wireframe = false;
 const turntable = false;
-const logfps = true;
+const logfps = false;
 const ibl = false;
 const rtt = false;
-const vr = true;
+const vr = false;
 const ar = false;
 const xrHitTest = false;
 const xrFeaturePoints = false;

@@ -1,8 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
+cls
+
 echo ========================================
-echo  BabylonNative Android Playground Deployer
+echo  BabylonNative Android Playground Runner
 echo ========================================
 
 :: Check if local.properties exists to get Android SDK path
@@ -161,5 +163,32 @@ set "YY=%dt:~2,2%" & set "YYYY=%dt:~0,4%" & set "MM=%dt:~4,2%" & set "DD=%dt:~6,
 set "HH=%dt:~8,2%" & set "Min=%dt:~10,2%" & set "Sec=%dt:~12,2%"
 set "datestamp=%YYYY%-%MM%-%DD%_%HH%-%Min%-%Sec%"
 
-:: Start logcat with tee-like functionality using PowerShell
-powershell -Command "& { $logFile = 'logs\android_logs_%datestamp%.txt'; Write-Host \"Logging to: $logFile\"; & '%ADB_PATH%' logcat -s BabylonNative | Tee-Object -FilePath $logFile }"
+:: Start logcat with tee-like functionality using PowerShell (foreground)
+set "LOG_FILE=logs\android_logs_%datestamp%.txt"
+echo Logging to: %LOG_FILE%
+
+echo.
+echo ========================================
+echo  App is running. Logs are being captured.
+echo  Press Ctrl+C to quit the app and stop logging.
+echo ========================================
+echo.
+
+:: Start logcat with tee functionality to show in terminal and save to file
+call "%ADB_PATH%" logcat -s BabylonNative | powershell -Command "$input | Tee-Object -FilePath '%LOG_FILE%'" 2>nul
+
+echo.
+echo.
+
+:quit_app
+echo Stopping the Playground app on device...
+"%ADB_PATH%" shell am force-stop com.android.babylonnative.playground
+
+echo Cleaning up any remaining processes...
+taskkill /f /im "adb.exe" /fi "CommandLine eq *logcat*" >nul 2>&1
+
+echo.
+echo ========================================
+echo  App stopped successfully!
+echo  Logs saved to: %LOG_FILE%
+echo ========================================

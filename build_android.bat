@@ -4,7 +4,9 @@ set ANDROID_HOME=C:\Users\andyf\AppData\Local\Android\Sdk
 set PATH=%JAVA_HOME%\bin;%ANDROID_HOME%\tools;%ANDROID_HOME%\platform-tools;%PATH%
 
 cd /d "C:\-\code\BabylonNative\Apps\Playground\Android"
-gradlew.bat assembleDebug
+call gradlew.bat assembleDebug
+
+cd /d "C:\-\code\BabylonNative"
 
 :: Check if build was successful
 if %errorlevel% equ 0 (
