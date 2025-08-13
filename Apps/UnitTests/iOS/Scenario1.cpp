@@ -1,5 +1,4 @@
 #include "../Shared/Shared.h"
-#include "../Shared/ThreadSafeActionQueue.h"
 
 #include <Babylon/AppRuntime.h>
 #include <Babylon/ScriptLoader.h>
@@ -9,6 +8,9 @@
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
+
+#include <arcana/threading/blocking_concurrent_queue.h>
+#include <arcana/threading/cancellation.h>
 
 #include <gtest/gtest.h>
 
@@ -104,22 +106,32 @@ private:
 
     std::unordered_map<long, Babylon::Plugins::ExternalTexture> sourceTextures;
 
-    thread_safe_action_queue pendingTextureUpdateQueue;
-    thread_safe_action_queue pendingTextureRemovalQueue;
+    arcana::blocking_concurrent_queue<std::function<void()>> pendingTextureUpdateQueue;
+    arcana::blocking_concurrent_queue<std::function<void()>> pendingTextureRemovalQueue;
+    arcana::cancellation_source pendingTextureCancel;
 
     std::optional<Babylon::Plugins::ExternalTexture> exportTexture{};
 
-    // TODO: Maybe use arcana's thread safe queue, instead (blocking concurrent queue - doesn't have to block).
     void PerformQueuedUpdateActions()
     {
         assert([NSThread isMainThread]);
-        pendingTextureUpdateQueue.performQueuedActions();
+
+        std::function<void()> action;
+        while (pendingTextureUpdateQueue.try_pop(action, pendingTextureCancel))
+        {
+            action();
+        }
     }
 
     void PerformQueuedRemovalActions()
     {
         assert([NSThread isMainThread]);
-        pendingTextureRemovalQueue.performQueuedActions();
+
+        std::function<void()> action;
+        while (pendingTextureRemovalQueue.try_pop(action, pendingTextureCancel))
+        {
+            action();
+        }
     }
 
     void RenderFrame()
@@ -323,7 +335,7 @@ private:
                 int sourceId = info[0].As<Napi::Number>().Int32Value();
 
                 // The source texture can only be removed between frame renders, so we queue the removal for the next available render.
-                pendingTextureRemovalQueue.queueAction([this, sourceId]() {
+                pendingTextureRemovalQueue.push([this, sourceId]() {
                     if (sourceTextures.find(sourceId) != sourceTextures.end())
                     {
                         sourceTextures.erase(sourceId);
