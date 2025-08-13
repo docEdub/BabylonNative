@@ -27,7 +27,7 @@
 {
     // This is a workaround to avoid creating a MTKView instance when running unit tests.
     // This is necessary because the MTKView initializer hangs in XCode 16 and prevents the unit tests from running.
-    // This hang doesn't happend when running the actual application, only the test suite.
+    // This hang doesn't happen when running actual applications, only the test suite.
     if (!NSClassFromString(@"XCTest"))
     {
         emptyView = [[MTKView alloc] init];
