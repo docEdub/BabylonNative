@@ -399,14 +399,6 @@ namespace
         var scene = new BABYLON.Scene(engine);
 
         scene.createDefaultCamera(true, true, true);
-        scene.clearColor = new BABYLON.Color4(0, 1, 0, 1);
-
-        // This isn't drawing anything for some reason.
-        const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
-        const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-        planeMaterial.emissiveColor = new BABYLON.Color3(0, 0, 1);
-        plane.material = planeMaterial;
-        plane.position.z = 1;
 
         engine.runRenderLoop(function () {
             // console.log("Rendering frame ...");
@@ -504,7 +496,13 @@ TEST_F(Scenario1Test, DestroySourceTexture)
         }
 
         if (ok) {
-            setTimeout(() => {
+            const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
+            const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
+            planeMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
+            plane.material = planeMaterial;
+            plane.position.z = 1;
+
+            scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
                 engine._engine.getFrameBufferData(function (screenshot) {
@@ -516,17 +514,10 @@ TEST_F(Scenario1Test, DestroySourceTexture)
                     // console.log(screenshot);
 
                     console.log("Saving render as image - done");
-                });
 
-                // Screenshots are created during the next frame render, so we need to render a frame.
-                console.log("Rendering frame to create screenshot ...");
-                renderFrame();
-
-                setTimeout(() => {
-                    console.log("Rendering frame to create screenshot - done");
                     setReady(true);
-                }, 1000);  
-            }, 5000);
+                });
+            });
         }
     )");
 
