@@ -238,6 +238,7 @@ private:
         {
             // Process pending blocks on the main queue.
             [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
+            RenderFrame();
         }
     }
 
@@ -408,11 +409,11 @@ namespace
         plane.position.z = 1;
 
         engine.runRenderLoop(function () {
-            console.log("Rendering frame ...");
+            // console.log("Rendering frame ...");
 
             scene.render();
 
-            console.log("Rendering frame - done");
+            // console.log("Rendering frame - done");
         });
 
         const shutdown = () => {
@@ -517,11 +518,11 @@ TEST_F(Scenario1Test, DestroySourceTexture)
                     console.log("Saving render as image - done");
                 });
 
-                // Screenshots are created during the next frame render, so we need to render a frame.
-                console.log("Rendering frame to create screenshot ...");
-                renderFrame().then(() => {
-                    setReady(true);
-                });
+                // // Screenshots are created during the next frame render, so we need to render a frame.
+                // console.log("Rendering frame to create screenshot ...");
+                // renderFrame().then(() => {
+                //     setReady(true);
+                // });
             });
         }
     )");
