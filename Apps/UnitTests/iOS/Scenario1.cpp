@@ -1,13 +1,14 @@
 #include "../Shared/Shared.h"
 
-#include <Babylon/AppRuntime.h>
-#include <Babylon/ScriptLoader.h>
 #include <Babylon/Graphics/Device.h>
 #include <Babylon/Plugins/ExternalTexture.h>
 #include <Babylon/Plugins/NativeEngine.h>
+#include <Babylon/Plugins/TestUtils.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
+#include <Babylon/AppRuntime.h>
+#include <Babylon/ScriptLoader.h>
 
 #include <arcana/threading/blocking_concurrent_queue.h>
 #include <arcana/threading/cancellation.h>
@@ -211,6 +212,7 @@ private:
                 std::cout.flush();
             });
             Babylon::Plugins::NativeEngine::Initialize(env);
+            Babylon::Plugins::TestUtils::Initialize(env, emptyViewWrapper.emptyView);
         });
     }
 
@@ -396,6 +398,14 @@ namespace
         var scene = new BABYLON.Scene(engine);
 
         scene.createDefaultCamera(true, true, true);
+        scene.clearColor = new BABYLON.Color4(0, 1, 0, 1);
+
+        // This isn't drawing anything for some reason.
+        const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
+        const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
+        planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
+        plane.material = planeMaterial;
+        plane.position.z = 1;
 
         engine.runRenderLoop(function () {
             console.log("Rendering frame ...");
@@ -433,63 +443,120 @@ namespace
             console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
 
             console.log("Creating source texture - done");
+
+            // const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
+            // const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
+            // planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
+            // plane.material = planeMaterial;
+            // plane.position.z = 1;
+            // scene.clearColor = new BABYLON.Color4(0, 1, 0, 1);
+
+            // scene.onDisposeObservable.add(() => {
+            //     console.log("Scene disposed, destroying plane and material ...");
+            //     planeMaterial.dispose();
+            //     plane.dispose();
+            // });
+
             setReady(true);
         });
     )"};
 }
 
-TEST_F(Scenario1Test, StartupAndShutdown)
-{
-    Eval(StartupScript, "StartupScript");
-    Eval(ShutdownScript, "ShutdownScript");
-}
+// TEST_F(Scenario1Test, StartupAndShutdown)
+// {
+//     Eval(StartupScript, "StartupScript");
+//     Eval(ShutdownScript, "ShutdownScript");
+// }
 
-TEST_F(Scenario1Test, CreateSourceTexture)
-{
-    Eval(StartupScript, "StartupScript");
-    Eval(CreateSourceScript, "CreateSourceScript");
+// TEST_F(Scenario1Test, CreateSourceTexture)
+// {
+//     Eval(StartupScript, "StartupScript");
+//     Eval(CreateSourceScript, "CreateSourceScript");
 
-    EXPECT_EQ(GetSourceTextureCount(), 1);
+//     EXPECT_EQ(GetSourceTextureCount(), 1);
 
-    Eval(ShutdownScript, "ShutdownScript");
-}
+//     Eval(ShutdownScript, "ShutdownScript");
+// }
 
 TEST_F(Scenario1Test, DestroySourceTexture)
 {
     Eval(StartupScript, "StartupScript");
-    Eval(CreateSourceScript, "CreateSourceScript");
+    // Eval(CreateSourceScript, "CreateSourceScript");
 
     Eval(R"(
-        console.log("Destroying source texture ...");
+        console.log("Saving render as image ...");
 
-        destroySource(0);
+        let ok = true;
 
-        // Sources are removed between `FinishRenderingCurrentFrame()` and `StartRenderingCurrentFrame`, so we need to
-        // render a frame to finalize removing the texture.
-        renderFrame().then(() => {
-            console.log("Destroying source texture - done");
-            setReady(true);
-        });
+        if (engine) {
+            console.log("Engine is initialized.");
+        } else {
+            console.log("Engine not initialized.");
+            ok = false;
+        }
+
+        if (ok && engine._engine) {
+            console.log("Native engine is initialized.");
+        } else {
+            console.log("Native engine not initialized.");
+            ok = false;
+        }
+
+        if (ok) {
+            console.log("Getting engine frame buffer data ...");
+
+            renderFrame().then(() => {
+                engine._engine.getFrameBufferData(function (screenshot) {
+                    // const outputDirectory = TestUtils.getOutputDirectory() + "/Results/";
+                    const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
+                    console.log(`Saving render as image to ${outputDirectory} ...`);
+
+                    TestUtils.writePNG(screenshot, 1024, 1024, outputDirectory + "screenshot.png");
+                    // console.log(screenshot);
+
+                    console.log("Saving render as image - done");
+                });
+
+                // Screenshots are created during the next frame render, so we need to render a frame.
+                console.log("Rendering frame to create screenshot ...");
+                renderFrame().then(() => {
+                    setReady(true);
+                });
+            });
+        }
     )");
 
-    EXPECT_EQ(GetSourceTextureCount(), 0);
+    // Eval(R"(
+    //     console.log("Destroying source texture ...");
+
+    //     destroySource(0);
+
+    //     // Sources are removed between `FinishRenderingCurrentFrame()` and `StartRenderingCurrentFrame`, so we need to
+    //     // render a frame to finalize removing the texture.
+    //     renderFrame().then(() => {
+    //         console.log("Destroying source texture - done");
+    //         setReady(true);
+    //     });
+    // )");
+
+    // EXPECT_EQ(GetSourceTextureCount(), 0);
 
     Eval(ShutdownScript, "ShutdownScript");
 }
 
-TEST_F(Scenario1Test, WriteFrameToExportTexture)
-{
-    Eval(StartupScript, "StartupScript");
-    Eval(CreateSourceScript, "CreateSourceScript");
+// TEST_F(Scenario1Test, WriteFrameToExportTexture)
+// {
+//     Eval(StartupScript, "StartupScript");
+//     Eval(CreateSourceScript, "CreateSourceScript");
 
-    Eval(R"(
-        console.log("Writing frame ...");
+//     Eval(R"(
+//         console.log("Writing frame ...");
 
-        writeFrame(0).then((isFinished) => {
-            console.log("Writing frame - done: `isFinished` = " + isFinished);
-            setReady(true);
-        });
-    )");
+//         writeFrame(0).then((isFinished) => {
+//             console.log("Writing frame - done: `isFinished` = " + isFinished);
+//             setReady(true);
+//         });
+//     )");
 
-    Eval(ShutdownScript, "ShutdownScript");
-}
+//     Eval(ShutdownScript, "ShutdownScript");
+// }

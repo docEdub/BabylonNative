@@ -27,6 +27,7 @@ if(APPLE)
         find_library(COREMEDIA_FRAMEWORK CoreMedia)
         find_library(METALKIT_FRAMEWORK MetalKit)
         set(ADDITIONAL_LIBRARIES PRIVATE ${ADDITIONAL_LIBRARIES}
+            PRIVATE TestUtils
             PRIVATE arcana
             PRIVATE ${COREMEDIA_FRAMEWORK}
             PRIVATE ${METALKIT_FRAMEWORK})
