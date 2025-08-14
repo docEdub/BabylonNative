@@ -404,7 +404,7 @@ namespace
         // This isn't drawing anything for some reason.
         const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
         const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-        planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
+        planeMaterial.emissiveColor = new BABYLON.Color3(0, 0, 1);
         plane.material = planeMaterial;
         plane.position.z = 1;
 
@@ -504,9 +504,9 @@ TEST_F(Scenario1Test, DestroySourceTexture)
         }
 
         if (ok) {
-            console.log("Getting engine frame buffer data ...");
+            setTimeout(() => {
+                console.log("Getting engine frame buffer data ...");
 
-            renderFrame().then(() => {
                 engine._engine.getFrameBufferData(function (screenshot) {
                     // const outputDirectory = TestUtils.getOutputDirectory() + "/Results/";
                     const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
@@ -518,12 +518,15 @@ TEST_F(Scenario1Test, DestroySourceTexture)
                     console.log("Saving render as image - done");
                 });
 
-                // // Screenshots are created during the next frame render, so we need to render a frame.
-                // console.log("Rendering frame to create screenshot ...");
-                // renderFrame().then(() => {
-                //     setReady(true);
-                // });
-            });
+                // Screenshots are created during the next frame render, so we need to render a frame.
+                console.log("Rendering frame to create screenshot ...");
+                renderFrame();
+
+                setTimeout(() => {
+                    console.log("Rendering frame to create screenshot - done");
+                    setReady(true);
+                }, 1000);  
+            }, 5000);
         }
     )");
 
