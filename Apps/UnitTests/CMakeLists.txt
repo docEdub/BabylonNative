@@ -12,9 +12,11 @@ set(EXTERNAL_SCRIPTS
     "../node_modules/chai/chai.umd.js"
     "../node_modules/mocha/mocha.umd.js")
 
-set(TEXTURES
-    "Textures/Checker_albedo_128x128.jpg"
-    "Textures/Checker_albedo.jpg")
+if(IOS)
+    set(TEXTURES
+        "iOS/Textures/Checker_albedo_128x128.jpg"
+        "iOS/Textures/Checker_albedo.jpg")
+endif()
 
 set(SOURCES
     "Shared/Shared.h"
