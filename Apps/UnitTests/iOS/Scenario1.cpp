@@ -449,7 +449,7 @@ namespace
 
             console.log("Creating source texture ...");
             // sourceTexture = new BABYLON.ThinTexture(wrappedTexture);
-            sourceTexture = new BABYLON.Texture(null, scene, false, {
+            sourceTexture = new BABYLON.Texture(null, scene, {
                 internalTexture: wrappedTexture,
                 onError: (message, exception) => {
                     console.error("Error creating source texture:", message, exception);
