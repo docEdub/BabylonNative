@@ -286,6 +286,8 @@ private:
             NSString* extension = @"jpg";
             NSURL* url = [[NSBundle mainBundle] URLForResource:filename withExtension:extension];
             NSError* error = nil;
+            // For available options see:
+            //  - https://developer.apple.com/documentation/metalkit/mtktextureloader/option?language=objc
             id<MTLTexture> texture = [loader newTextureWithContentsOfURL:url
                                                                  options:@{MTKTextureLoaderOptionSRGB : @NO,
                                                                  }
@@ -430,25 +432,33 @@ namespace
     const std::string CreateSourceScript{R"(
         console.log("Creating source texture ...");
 
+        let sourceTexture = null;
+
         createSource(0).then((texture) => {
             // TODO: Is there a way to make sure the texture is a valid external texture?
             console.log("Source texture created: " + (texture instanceof BABYLON.ExternalTexture ? "ExternalTexture" : "Unknown type"));
             console.log("typeof texture: " + typeof texture); // prints "typeof texture: object"
 
+            console.log("Wrapping texture ...");
+            const wrappedTexture = engine.wrapNativeTexture(texture);
+            console.log("Wrapping texture - done");
+
+            Object.getOwnPropertyNames(wrappedTexture).forEach((prop) => {
+                console.log(`   wrappedTexture.${prop}`);
+            });
+
+            console.log("Creating source texture ...");
+            // sourceTexture = new BABYLON.ThinTexture(wrappedTexture);
+            sourceTexture = new BABYLON.Texture(null, scene, false, {
+                internalTexture: wrappedTexture,
+                onError: (message, exception) => {
+                    console.error("Error creating source texture:", message, exception);
+                },
+                onLoad: () => {
+                    console.log("Source texture loaded successfully.");
+                },
+            });
             console.log("Creating source texture - done");
-
-            // const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
-            // const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-            // planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
-            // plane.material = planeMaterial;
-            // plane.position.z = 1;
-            // scene.clearColor = new BABYLON.Color4(0, 1, 0, 1);
-
-            // scene.onDisposeObservable.add(() => {
-            //     console.log("Scene disposed, destroying plane and material ...");
-            //     planeMaterial.dispose();
-            //     plane.dispose();
-            // });
 
             setReady(true);
         });
@@ -474,7 +484,7 @@ namespace
 TEST_F(Scenario1Test, DestroySourceTexture)
 {
     Eval(StartupScript, "StartupScript");
-    // Eval(CreateSourceScript, "CreateSourceScript");
+    Eval(CreateSourceScript, "CreateSourceScript");
 
     Eval(R"(
         console.log("Saving render as image ...");
@@ -495,13 +505,27 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             ok = false;
         }
 
+        if (ok && sourceTexture) {
+            console.log("Source texture is initialized.");
+        } else {
+            console.log("Source texture not initialized.");
+            ok = false;
+        }
+
         if (ok) {
             const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
             const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-            planeMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
+            planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
+
+            planeMaterial.emissiveTexture = sourceTexture;
+
+            console.log("Setting plane material ...");
             plane.material = planeMaterial;
+            console.log("Setting plane material - done");
+
             plane.position.z = 1;
 
+            console.log("scene.executeWhenReady ...");
             scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
@@ -518,6 +542,7 @@ TEST_F(Scenario1Test, DestroySourceTexture)
                     setReady(true);
                 });
             });
+            console.log("scene.executeWhenReady - done");
         }
     )");
 
