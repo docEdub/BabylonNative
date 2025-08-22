@@ -610,7 +610,7 @@ TEST_F(Scenario1Test, DestroySourceTexture)
         if (ok) {
             const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
             const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-            planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
+            // planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
 
             planeMaterial.emissiveTexture = sourceTexture;
 
@@ -624,17 +624,14 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
-                engine._engine.getFrameBufferData(function (renderedImageData) {
-                    // const outputDirectory = TestUtils.getOutputDirectory() + "/Results/";
-                    // const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
-                    // console.log(`Saving render as image to ${outputDirectory} ...`);
-
-                    // TestUtils.writePNG(renderedImageData, 1024, 1024, outputDirectory + "screenshot.png");
-
-                    // console.log("Saving render as image - done");
-
+                engine._engine.getFrameBufferData((renderedImageData) => {
                     GetReferenceImageData().then((referenceImageData) => {
                         CompareImages(renderedImageData, referenceImageData);
+
+                        const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
+                        TestUtils.writePNG(referenceImageData, 1024, 1024, outputDirectory + "reference.png");
+                        TestUtils.writePNG(renderedImageData, 1024, 1024, outputDirectory + "rendered.png");
+
                         setReady(true);
                     });
                 });
