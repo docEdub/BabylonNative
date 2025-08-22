@@ -610,8 +610,6 @@ TEST_F(Scenario1Test, DestroySourceTexture)
         if (ok) {
             const plane = BABYLON.MeshBuilder.CreatePlane("plane", { size: 2 }, scene);
             const planeMaterial = new BABYLON.StandardMaterial("planeMaterial", scene);
-            // planeMaterial.emissiveColor = new BABYLON.Color3(1, 0, 0);
-
             planeMaterial.emissiveTexture = sourceTexture;
 
             console.log("Setting plane material ...");
@@ -624,7 +622,10 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
-                engine._engine.getFrameBufferData((renderedImageData) => {
+                engine._engine.getFrameBufferData((frameBufferData) => {
+                    // Make a copy to retain the data correctly after `GetReferenceImageData` resolves.
+                    const renderedImageData = frameBufferData.slice();
+
                     GetReferenceImageData().then((referenceImageData) => {
                         CompareImages(renderedImageData, referenceImageData);
 
