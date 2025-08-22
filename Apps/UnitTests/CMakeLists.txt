@@ -16,6 +16,9 @@ if(IOS)
     set(TEXTURES
         "iOS/Textures/Checker_albedo_128x128.jpg"
         "iOS/Textures/Checker_albedo.jpg")
+
+    set(REFERENCE_IMAGES
+        "iOS/ReferenceImages/Scenario1_reference.png")
 endif()
 
 set(SOURCES
@@ -44,7 +47,7 @@ elseif(WIN32)
     set(SOURCES ${SOURCES} "Win32/App.cpp")
 endif()
 
-add_executable(UnitTests ${SCRIPTS} ${EXTERNAL_SCRIPTS} ${SOURCES} ${TEXTURES})
+add_executable(UnitTests ${SCRIPTS} ${EXTERNAL_SCRIPTS} ${SOURCES} ${TEXTURES} ${REFERENCE_IMAGES})
 set_property(TARGET UnitTests PROPERTY UNITY_BUILD false)
 
 target_link_libraries(UnitTests
@@ -68,10 +71,14 @@ if(IOS)
         ${EXTERNAL_SCRIPTS}
         PROPERTIES MACOSX_PACKAGE_LOCATION "Scripts")
 
+    set_source_files_properties(
+        ${TEXTURES}
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Textures")
+
     set_target_properties(UnitTests PROPERTIES
         MACOSX_BUNDLE true
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/iOS/Info.plist"
-        RESOURCE "${SCRIPTS};${EXTERNAL_SCRIPTS};${TEXTURES}"
+        RESOURCE "${SCRIPTS};${EXTERNAL_SCRIPTS};${TEXTURES};${REFERENCE_IMAGES}"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "18.0"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.BabylonNative.UnitTests.iOS")
 else()

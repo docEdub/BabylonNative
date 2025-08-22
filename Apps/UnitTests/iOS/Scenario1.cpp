@@ -429,6 +429,100 @@ namespace
         setReady(true);
     )"};
 
+    const std::string CreateTestFunctionsScript{R"(
+        console.log("Creating test functions ...");
+
+        async function GetReferenceImageData() {
+            console.log("Getting reference image data ...");
+
+            // return new Promise((resolve, reject) => {
+            //     console.log("Getting reference image data - done");
+            //     resolve([]);
+            // });
+
+            return new Promise((resolve, reject) => {
+                // TODO: Get this to load from "app:///ReferenceImages/Scenario1_reference.png"
+                // - might just need to do full CMake reconfigure.
+                const url = "app:///Scenario1_reference.png";
+
+                const onLoadFileError = function (request, exception) {
+                    console.error("Failed to retrieve " + url + ".", exception);
+                    reject(exception);
+                };
+
+                const onload = function (data, responseURL) {
+                    if (typeof (data) === "string") {
+                        throw new Error("Decode Image from string data not yet implemented.");
+                    }
+
+                    const referenceImage = TestUtils.decodeImage(data);
+                    const referenceImageData = TestUtils.getImageData(referenceImage);
+
+                    console.log("Getting reference image data - done");
+
+                    resolve(referenceImageData);
+                };
+
+                BABYLON.Tools.LoadFile(url, onload, undefined, undefined, /*useArrayBuffer*/true, onLoadFileError);
+            });
+        }
+
+        function CompareImages(imageDataA, imageDataB) {
+            console.log("Comparing images ...");
+
+            if (!imageDataA) {
+                console.log("No rendered image data available.");
+                return;
+            }
+
+            if (!imageDataB) {
+                console.log("No reference image data available.");
+                return;
+            }
+
+            if (imageDataA.length != imageDataB.length) {
+                throw new Error(`Reference data length (${imageDataB.length}) must match render data length (${imageDataA.length})`);
+            }
+
+            const size = imageDataA.length;
+            let differencesCount = 0;
+
+            const threshold = 25; // Threshold for pixel color difference
+
+            for (let index = 0; index < size; index += 4) {
+                if (Math.abs(imageDataA[index] - imageDataB[index]) < threshold &&
+                    Math.abs(imageDataA[index + 1] - imageDataB[index + 1]) < threshold &&
+                    Math.abs(imageDataA[index + 2] - imageDataB[index + 2]) < threshold) {
+                    continue;
+                }
+
+                if (differencesCount === 0) {
+                    console.log(`First pixel off at ${index}: Value: (${imageDataA[index]}, ${imageDataA[index + 1]}, ${imageDataA[index] + 2}) - Expected: (${imageDataB[index]}, ${imageDataB[index + 1]}, ${imageDataB[index + 2]}) `);
+                }
+
+                imageDataB[index] = 255;
+                imageDataB[index + 1] *= 0.5;
+                imageDataB[index + 2] *= 0.5;
+                differencesCount++;
+            }
+
+            if (differencesCount) {
+                console.log("Pixel difference: " + differencesCount + " pixels.");
+            } else {
+                console.log("No pixel difference!");
+            }
+
+            const errorRatio = (differencesCount * 100) / (size / 4);
+            console.log(`Error ratio = ${errorRatio}`);
+
+            console.log("Comparing images - done");
+        }
+
+        setReady(true);
+
+        console.log("Creating test functions - done");
+    )"};
+
     const std::string CreateSourceScript{R"(
         console.log("Creating source texture ...");
 
@@ -443,9 +537,9 @@ namespace
             const wrappedTexture = engine.wrapNativeTexture(texture);
             console.log("Wrapping texture - done");
 
-            Object.getOwnPropertyNames(wrappedTexture).forEach((prop) => {
-                console.log(`   wrappedTexture.${prop}`);
-            });
+            // Object.getOwnPropertyNames(wrappedTexture).forEach((prop) => {
+            //     console.log(`   wrappedTexture.${prop}`);
+            // });
 
             console.log("Creating source texture ...");
             // sourceTexture = new BABYLON.ThinTexture(wrappedTexture);
@@ -484,6 +578,7 @@ namespace
 TEST_F(Scenario1Test, DestroySourceTexture)
 {
     Eval(StartupScript, "StartupScript");
+    Eval(CreateTestFunctionsScript, "CreateTestFunctionsScript");
     Eval(CreateSourceScript, "CreateSourceScript");
 
     Eval(R"(
@@ -529,17 +624,19 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
-                engine._engine.getFrameBufferData(function (screenshot) {
+                engine._engine.getFrameBufferData(function (renderedImageData) {
                     // const outputDirectory = TestUtils.getOutputDirectory() + "/Results/";
-                    const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
-                    console.log(`Saving render as image to ${outputDirectory} ...`);
+                    // const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
+                    // console.log(`Saving render as image to ${outputDirectory} ...`);
 
-                    TestUtils.writePNG(screenshot, 1024, 1024, outputDirectory + "screenshot.png");
-                    // console.log(screenshot);
+                    // TestUtils.writePNG(renderedImageData, 1024, 1024, outputDirectory + "screenshot.png");
 
-                    console.log("Saving render as image - done");
+                    // console.log("Saving render as image - done");
 
-                    setReady(true);
+                    GetReferenceImageData().then((referenceImageData) => {
+                        CompareImages(renderedImageData, referenceImageData);
+                        setReady(true);
+                    });
                 });
             });
             console.log("scene.executeWhenReady - done");
