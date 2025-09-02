@@ -622,11 +622,8 @@ TEST_F(Scenario1Test, DestroySourceTexture)
             scene.executeWhenReady(() => {
                 console.log("Getting engine frame buffer data ...");
 
-                engine._engine.getFrameBufferData((frameBufferData) => {
-                    // Make a copy to retain the data correctly after `GetReferenceImageData` resolves.
-                    const renderedImageData = frameBufferData.slice();
-
-                    GetReferenceImageData().then((referenceImageData) => {
+                GetReferenceImageData().then((referenceImageData) => {
+                    engine._engine.getFrameBufferData((renderedImageData) => {
                         CompareImages(renderedImageData, referenceImageData);
 
                         const outputDirectory = "/Users/andy/-/code/BabylonNative/Results/";
